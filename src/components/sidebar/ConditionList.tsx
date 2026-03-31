@@ -91,6 +91,8 @@ export function ConditionList({
           const sourceText = getQuestionText(rule.sourceQuestionId);
           const sourceFullText = getQuestionFullText(rule.sourceQuestionId);
           const isHovered = hoveredQuestionId === rule.sourceQuestionId;
+          const isInvalidEnd =
+            rule.action.type === 'jump_to' && rule.action.targetQuestionId === '__invalid_end__';
 
           return (
             <div
@@ -177,6 +179,15 @@ export function ConditionList({
                       <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-error text-error-content">
                         Anketi Bitir
                       </span>
+                    ) : isInvalidEnd ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-warning/90 text-warning-content">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M12 8v4" />
+                          <path d="M12 16h.01" />
+                        </svg>
+                        Geçersiz Bitir
+                      </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-success/90 text-success-content">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -193,6 +204,8 @@ export function ConditionList({
                   <p className="text-[10px] text-base-content/40 italic">
                     {rule.action.type === 'end_survey' ? (
                       <>Kullanıcı <span className="font-medium text-base-content/50">S{srcQuestion?.order}</span> sorusuna <span className="font-medium text-base-content/50">{answerValue}</span> derse → <span className="font-medium text-error/70">Süreci Sonlandır</span></>
+                    ) : isInvalidEnd ? (
+                      <>Kullanıcı <span className="font-medium text-base-content/50">S{srcQuestion?.order}</span> sorusuna <span className="font-medium text-base-content/50">{answerValue}</span> derse → <span className="font-medium text-warning/80">Geçersiz Bitir</span></>
                     ) : (
                       <>Kullanıcı <span className="font-medium text-base-content/50">S{srcQuestion?.order}</span> sorusuna <span className="font-medium text-base-content/50">{answerValue}</span> derse → <span className="font-medium text-success/70">S{getQuestion(rule.action.targetQuestionId)?.order}</span> sorusuna git</>
                     )}
@@ -201,7 +214,7 @@ export function ConditionList({
               </div>
 
               {/* Connection Line Visual (n8n-style wire hint) */}
-              <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute bottom-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           );
         })}

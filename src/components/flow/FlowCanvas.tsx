@@ -16,6 +16,7 @@ import '@xyflow/react/dist/style.css';
 import type { Question, ConditionalRule, ConditionInput, NodePositions, SequentialEdges } from '../../types/survey';
 import { QuestionNode, type QuestionNodeData } from './QuestionNode';
 import { EndNode } from './EndNode';
+import { InvalidEndNode } from './InvalidEndNode';
 import { StartNode } from './StartNode';
 import { ConditionEditorModal } from '../modals/ConditionEditorModal';
 import { EdgeContextMenu } from './EdgeContextMenu';
@@ -24,11 +25,13 @@ import type { ConditionSummary } from './QuestionNodeTooltip';
 
 const START_NODE_ID = '__start__';
 const END_NODE_ID = '__end__';
+const INVALID_END_NODE_ID = '__invalid_end__';
 
 const nodeTypes = {
   start: StartNode,
   question: QuestionNode,
   end: EndNode,
+  invalidEnd: InvalidEndNode,
 };
 
 interface FlowCanvasProps {
@@ -42,6 +45,7 @@ interface FlowCanvasProps {
   onUpdateCondition: (conditionId: string, input: ConditionInput) => void;
   onRemoveCondition: (conditionId: string) => void;
   onSelectQuestion: (guid: string) => void;
+  onDeleteQuestion?: (guid: string) => void;
   /** Callback when node positions change (user drags nodes) */
   onNodePositionsChange?: (positions: NodePositions) => void;
   /** Callback when sequential edges change */
@@ -70,6 +74,11 @@ function buildConditionSummaries(
         // TypeScript knows this is 'jump_to' here
         const jumpAction = rule.action;
         if (jumpAction.type === 'jump_to') {
+          if (jumpAction.targetQuestionId === '__invalid_end__') {
+            actionLabel = 'Geçersiz';
+            isEnd = true;
+            return { description: desc, actionLabel, isEnd };
+          }
           const target = questions.find((q) => q.guid === jumpAction.targetQuestionId);
           actionLabel = target ? `S${target.order}` : '?';
         } else {
@@ -85,6 +94,7 @@ function buildNodes(
   questions: Question[],
   conditions: ConditionalRule[],
   savedPositions?: NodePositions,
+  onDeleteQuestion?: (guid: string) => void,
 ): Node[] {
   const xCenter = 400;
   const yStartOffset = 220; // leave room for start node
@@ -124,6 +134,7 @@ function buildNodes(
         guid: q.guid,
         settings: q.settings,
         conditions: condSummaries,
+        onDelete: onDeleteQuestion,
       } satisfies QuestionNodeData,
     });
   });
@@ -138,6 +149,19 @@ function buildNodes(
     id: END_NODE_ID,
     type: 'end',
     position: savedEndPos ?? defaultEndPos,
+    data: {},
+  });
+
+  // Invalid end node
+  const savedInvalidEndPos = savedPositions?.__invalid_end__;
+  const defaultInvalidEndPos = {
+    x: xCenter + 320,
+    y: yStartOffset + questions.length * yGap + 40,
+  };
+  allNodes.push({
+    id: INVALID_END_NODE_ID,
+    type: 'invalidEnd',
+    position: savedInvalidEndPos ?? defaultInvalidEndPos,
     data: {},
   });
 
@@ -199,7 +223,12 @@ function buildEdges(questions: Question[], conditions: ConditionalRule[], sequen
   // 1. Custom edges first (they have priority over defaults)
   customEdgesList.forEach((custom) => {
     const realSource = custom.source === '__start__' ? START_NODE_ID : custom.source;
-    const realTarget = custom.target === '__end__' ? END_NODE_ID : custom.target;
+    const realTarget =
+      custom.target === '__end__'
+        ? END_NODE_ID
+        : custom.target === '__invalid_end__'
+          ? INVALID_END_NODE_ID
+          : custom.target;
     const edgeId = `seq-${custom.source}-${custom.target}`;
     addSeqEdge(edgeId, realSource, realTarget, custom.source === '__start__');
   });
@@ -228,14 +257,20 @@ function buildEdges(questions: Question[], conditions: ConditionalRule[], sequen
       rule.action.type === 'end_survey'
         ? END_NODE_ID
         : rule.action.targetQuestionId;
-    const isEnd = rule.action.type === 'end_survey';
-    const color = isEnd ? 'oklch(65% 0.2 25)' : 'oklch(65% 0.19 281)';
-    const label = buildEdgeLabel(rule, questions);
+    const isInvalidEnd = target === '__invalid_end__';
+    const isEnd = rule.action.type === 'end_survey' || isInvalidEnd;
+    const color = isInvalidEnd
+      ? 'oklch(83% 0.16 85)'
+      : isEnd
+        ? 'oklch(65% 0.2 25)'
+        : 'oklch(65% 0.19 281)';
+    const label = isInvalidEnd ? 'Geçersiz Bitir' : buildEdgeLabel(rule, questions);
+    const realTarget = target === '__invalid_end__' ? INVALID_END_NODE_ID : target;
 
     edges.push({
       id: `cond-${rule.id}`,
       source: rule.sourceQuestionId,
-      target,
+      target: realTarget,
       type: 'smoothstep',
       animated: true,
       label,
@@ -289,6 +324,7 @@ export function FlowCanvas({
   onUpdateCondition,
   onRemoveCondition,
   onSelectQuestion,
+  onDeleteQuestion,
   onNodePositionsChange,
   onSequentialEdgesChange,
 }: FlowCanvasProps) {
@@ -299,7 +335,10 @@ export function FlowCanvas({
     return [...questions].sort((a, b) => a.order - b.order);
   }, [questions]);
 
-  const initialNodes = useMemo(() => buildNodes(sortedQuestions, conditions, nodePositions), [sortedQuestions, conditions, nodePositions]);
+  const initialNodes = useMemo(
+    () => buildNodes(sortedQuestions, conditions, nodePositions, onDeleteQuestion),
+    [sortedQuestions, conditions, nodePositions, onDeleteQuestion],
+  );
   const initialEdges = useMemo(
     () => buildEdges(sortedQuestions, conditions, sequentialEdges),
     [sortedQuestions, conditions, sequentialEdges],
@@ -315,6 +354,7 @@ export function FlowCanvas({
   const [editingCondition, setEditingCondition] = useState<ConditionalRule | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [connTypeMenu, setConnTypeMenu] = useState<ConnectionTypeMenu | null>(null);
+  const [nodeMenu, setNodeMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   // Track node positions and notify parent when they change (only when not dragging)
   useEffect(() => {
@@ -324,6 +364,8 @@ export function FlowCanvas({
     nodes.forEach((node) => {
       if (node.id === END_NODE_ID) {
         positions.__end__ = node.position;
+      } else if (node.id === INVALID_END_NODE_ID) {
+        positions.__invalid_end__ = node.position;
       } else if (node.id === START_NODE_ID) {
         positions.__start__ = node.position;
       } else {
@@ -335,6 +377,7 @@ export function FlowCanvas({
     const hasChanges = Object.keys(positions).some((id) => {
       const saved =
         id === '__end__' ? nodePositions?.__end__ :
+        id === '__invalid_end__' ? nodePositions?.__invalid_end__ :
         id === '__start__' ? nodePositions?.__start__ :
         nodePositions?.[id];
       const current = positions[id];
@@ -359,7 +402,7 @@ export function FlowCanvas({
     if (isDragging) return;
 
     setNodes((prev) => {
-      const built = buildNodes(sortedQuestions, conditions, nodePositions);
+      const built = buildNodes(sortedQuestions, conditions, nodePositions, onDeleteQuestion);
       const existingIds = new Set(prev.map((n) => n.id));
       const builtIds = new Set(built.map((n) => n.id));
 
@@ -392,7 +435,7 @@ export function FlowCanvas({
         return n;
       });
     });
-  }, [sortedQuestions, conditions, isDragging, setNodes]);
+  }, [sortedQuestions, conditions, isDragging, setNodes, nodePositions, onDeleteQuestion]);
 
   useEffect(() => {
     setEdges(buildEdges(sortedQuestions, conditions, sequentialEdges));
@@ -402,6 +445,7 @@ export function FlowCanvas({
     (connection: Connection) => {
       if (!connection.source || !connection.target) return;
       if (connection.source === END_NODE_ID) return;
+      if (connection.source === INVALID_END_NODE_ID) return;
       if (connection.target === START_NODE_ID) return; // Cannot connect to start node
       if (connection.source === connection.target) return;
 
@@ -530,16 +574,32 @@ export function FlowCanvas({
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       setContextMenu(null);
-      if (node.id !== END_NODE_ID && node.id !== START_NODE_ID) {
+      setNodeMenu(null);
+      if (node.id !== END_NODE_ID && node.id !== START_NODE_ID && node.id !== INVALID_END_NODE_ID) {
         onSelectQuestion(node.id);
       }
     },
     [onSelectQuestion],
   );
 
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    if (node.id === START_NODE_ID || node.id === END_NODE_ID || node.id === INVALID_END_NODE_ID) return;
+    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+    if (!wrapperRect) return;
+    setContextMenu(null);
+    setConnTypeMenu(null);
+    setNodeMenu({
+      id: node.id,
+      x: event.clientX - wrapperRect.left,
+      y: event.clientY - wrapperRect.top,
+    });
+  }, []);
+
   const onPaneClick = useCallback(() => {
     setContextMenu(null);
     setConnTypeMenu(null);
+    setNodeMenu(null);
   }, []);
 
   // --- Context menu handlers ---
@@ -564,12 +624,41 @@ export function FlowCanvas({
       const current = sequentialEdges ?? {};
       const blocked = new Set(current.blockedEdges ?? []);
       blocked.add(edgeId);
-      
-      // Also remove from custom edges if it exists there
+
+      // Parse source/target from edge id: seq-{source}-{target}
+      const raw = edgeId.startsWith('seq-') ? edgeId.slice(4) : edgeId;
+      const splitAt = raw.lastIndexOf('-');
+      const sourceId = splitAt >= 0 ? raw.slice(0, splitAt) : raw;
+      const targetId = splitAt >= 0 ? raw.slice(splitAt + 1) : '';
+
+      // Remove custom sequential edge(s) from same source to keep it disconnected
       const customEdges = (current.customEdges ?? []).filter(
-        (e) => `seq-${e.source}-${e.target}` !== edgeId
+        (e) => e.source !== sourceId,
       );
-      
+
+      // IMPORTANT:
+      // If user deletes a custom edge, default edge from the same source should NOT return.
+      // So we proactively block that default path too.
+      if (sourceId === START_NODE_ID) {
+        if (sortedQuestions.length > 0) {
+          blocked.add(`seq-__start__-${sortedQuestions[0].guid}`);
+        }
+      } else {
+        const srcIdx = sortedQuestions.findIndex((q) => q.guid === sourceId);
+        if (srcIdx >= 0) {
+          if (srcIdx < sortedQuestions.length - 1) {
+            blocked.add(`seq-${sourceId}-${sortedQuestions[srcIdx + 1].guid}`);
+          } else {
+            blocked.add(`seq-${sourceId}-end`);
+          }
+        }
+      }
+
+      // Also keep the exact deleted target blocked (for custom target ids)
+      if (targetId) {
+        blocked.add(`seq-${sourceId}-${targetId}`);
+      }
+
       onSequentialEdgesChange({
         blockedEdges: Array.from(blocked),
         customEdges,
@@ -630,6 +719,7 @@ export function FlowCanvas({
           onConnect={onConnect}
           onEdgeClick={onEdgeClick}
           onNodeClick={onNodeClick}
+          onNodeContextMenu={onNodeContextMenu}
           onPaneClick={onPaneClick}
           nodeTypes={nodeTypes}
           fitView
@@ -646,7 +736,7 @@ export function FlowCanvas({
         />
         <Controls
           showInteractive={false}
-          className="!bg-base-100 !border-base-300/40 !rounded-xl !shadow-lg"
+          className="bg-base-100! border-base-300/40! rounded-xl! shadow-lg!"
         />
       </ReactFlow>
 
@@ -699,6 +789,31 @@ export function FlowCanvas({
           onDelete={handleContextDelete}
           onClose={() => setContextMenu(null)}
         />
+      )}
+
+      {nodeMenu && (
+        <>
+          <div className="fixed inset-0 z-55" onClick={() => setNodeMenu(null)} />
+          <div
+            className="absolute z-56 bg-base-100 rounded-xl shadow-xl border border-base-300/40 py-1.5 min-w-[160px] animate-fade-slide-in"
+            style={{ left: nodeMenu.x, top: nodeMenu.y }}
+          >
+            <button
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-error/80 hover:bg-error/5 hover:text-error transition-colors"
+              onClick={() => {
+                onDeleteQuestion?.(nodeMenu.id);
+                setNodeMenu(null);
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18" />
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              </svg>
+              Soruyu Sil
+            </button>
+          </div>
+        </>
       )}
 
       {sourceQuestion && (pendingConn || editingCondition) && (

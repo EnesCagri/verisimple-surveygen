@@ -13,6 +13,8 @@ export interface QuestionNodeData {
   settings?: QuestionSettings;
   /** Pre-computed condition summaries for tooltip */
   conditions?: ConditionSummary[];
+  /** Quick delete handler from flow canvas */
+  onDelete?: (guid: string) => void;
   [key: string]: unknown;
 }
 
@@ -89,7 +91,7 @@ const typeConfig: Record<QuestionType, { label: string; icon: React.JSX.Element 
 
 function QuestionNodeComponent({ data, selected }: NodeProps) {
   const d = data as unknown as QuestionNodeData;
-  const { order, text, type, answers, settings, conditions = [] } = d;
+  const { order, text, type, answers, settings, conditions = [], guid, onDelete } = d;
 
   const config = typeConfig[type] ?? { label: 'Bilinmeyen', icon: null };
 
@@ -158,15 +160,33 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
     >
       <div
         className={`
-          bg-base-100 rounded-2xl border-2 shadow-lg min-w-[220px] max-w-[280px]
+          group bg-base-100 rounded-2xl border-2 shadow-lg min-w-[220px] max-w-[280px]
           transition-all duration-200
           ${selected ? 'border-primary shadow-primary/20' : 'border-base-300/50 hover:border-primary/40'}
         `}
       >
+        {onDelete && (
+          <button
+            className={`absolute -top-2 -right-2 z-20 flex items-center justify-center w-6 h-6 rounded-full border border-error/25 bg-error text-white shadow-sm transition-all ${
+              selected ? 'opacity-100 scale-100' : 'opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100'
+            }`}
+            title="Soruyu sil"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(guid);
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
+
         <Handle
           type="target"
           position={Position.Top}
-          className="!w-3 !h-3 !bg-primary !border-2 !border-base-100 !-top-1.5"
+          className="w-3! h-3! bg-primary! border-2! border-base-100! -top-1.5!"
         />
 
         {/* Header */}
@@ -196,7 +216,7 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
         <Handle
           type="source"
           position={Position.Bottom}
-          className="!w-3 !h-3 !bg-primary !border-2 !border-base-100 !-bottom-1.5"
+          className="w-3! h-3! bg-primary! border-2! border-base-100! -bottom-1.5!"
         />
       </div>
 

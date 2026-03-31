@@ -46,6 +46,7 @@ export function createQuestion(
     text: '',
     type,
     answers: defaultAnswers[type] ?? [''],
+    required: true,
     guid: generateId(),
   };
 

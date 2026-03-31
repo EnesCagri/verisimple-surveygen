@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import type { Survey } from '../../types/survey';
 import { SurveyCard } from './SurveyCard';
 import { Tooltip } from '../ui/Tooltip';
@@ -10,6 +11,20 @@ interface DashboardProps {
   onDeleteSurvey: (id: string) => void;
 }
 
+function getLastEditedSurveyId(surveys: Survey[]): string | null {
+  if (surveys.length === 0) return null;
+  const sorted = [...surveys].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  );
+  // Only show banner if updated in the last 7 days and has at least one question
+  const latest = sorted[0];
+  const ageMs = Date.now() - new Date(latest.updatedAt).getTime();
+  if (ageMs < 7 * 24 * 60 * 60 * 1000 && latest.questions.length > 0) {
+    return latest.id;
+  }
+  return null;
+}
+
 export function Dashboard({
   surveys,
   onCreateNew,
@@ -17,6 +32,35 @@ export function Dashboard({
   onOpenSurvey,
   onDeleteSurvey,
 }: DashboardProps) {
+  const [showResumeBanner, setShowResumeBanner] = useState(false);
+  const [resumeId, setResumeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('vs:page');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed?.type === 'builder' && parsed.surveyId) {
+        const survey = surveys.find((s) => s.id === parsed.surveyId);
+        if (survey && survey.questions.length > 0) {
+          setResumeId(parsed.surveyId);
+          setShowResumeBanner(true);
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Fallback: last edited survey
+    const lastId = getLastEditedSurveyId(surveys);
+    if (lastId) {
+      setResumeId(lastId);
+      setShowResumeBanner(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const resumeSurvey = surveys.find((s) => s.id === resumeId);
+
   return (
     <div className="min-h-screen bg-base-200">
       {/* Header */}
@@ -55,6 +99,42 @@ export function Dashboard({
           </div>
         </div>
       </header>
+
+      {/* Resume banner */}
+      {showResumeBanner && resumeSurvey && (
+        <div className="bg-primary/6 border-b border-primary/15">
+          <div className="max-w-5xl mx-auto px-6 py-3 flex items-center gap-4">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0">
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span className="text-sm text-base-content/70 truncate">
+                <span className="font-semibold text-base-content/85">{resumeSurvey.title}</span>
+                {' '}— kaldığınız yerden devam edebilirsiniz
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                className="btn btn-primary btn-xs rounded-lg px-3"
+                onClick={() => { setShowResumeBanner(false); onOpenSurvey(resumeSurvey.id); }}
+              >
+                Devam Et
+              </button>
+              <button
+                className="p-1 rounded-lg hover:bg-base-300/40 text-base-content/30 hover:text-base-content/60 transition-colors"
+                onClick={() => setShowResumeBanner(false)}
+                title="Kapat"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="max-w-5xl mx-auto px-6 py-8">

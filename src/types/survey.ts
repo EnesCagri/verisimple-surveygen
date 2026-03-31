@@ -145,6 +145,8 @@ export interface NodePositions {
   __start__?: { x: number; y: number };
   /** Special key for end node */
   __end__?: { x: number; y: number };
+  /** Special key for invalid end node */
+  __invalid_end__?: { x: number; y: number };
 }
 
 /**

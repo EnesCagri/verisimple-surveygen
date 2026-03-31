@@ -31,6 +31,9 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
   const [matrixAnswers, setMatrixAnswers] = useState<Record<string, Record<number, string[]>>>({});
   const [sortableAnswers, setSortableAnswers] = useState<Record<string, string[]>>({});
   const [ended, setEnded] = useState(false);
+  const [endedInvalid, setEndedInvalid] = useState(false);
+  const [requiredSkipArmedGuid, setRequiredSkipArmedGuid] = useState<string | null>(null);
+  const [showRequiredSkipToast, setShowRequiredSkipToast] = useState(false);
   // Control question results: question guid -> { isCorrect: boolean, userAnswer: string[], correctAnswer: string[] }
   const [controlQuestionResults, setControlQuestionResults] = useState<Record<string, { isCorrect: boolean; userAnswer: string[]; correctAnswer: string[] }>>({});
 
@@ -43,6 +46,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
 
   const isFirst = path.length <= 1;
   const isCompleted = ended || (currentGuid === null && path.length > 0);
+  const isSurveyValid = !endedInvalid;
 
   const isLast =
     !ended &&
@@ -144,7 +148,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
    */
   function resolveNext(
     sourceGuid: string,
-  ): { type: 'question'; guid: string } | { type: 'end' } | { type: 'sequential' } {
+  ): { type: 'question'; guid: string } | { type: 'end' } | { type: 'end_invalid' } | { type: 'sequential' } {
     const question = questions.find((q) => q.guid === sourceGuid);
     if (!question) return { type: 'sequential' };
 
@@ -164,6 +168,9 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
         return { type: 'end' };
       }
       if (rule.action.type === 'jump_to') {
+        if (rule.action.targetQuestionId === '__invalid_end__') {
+          return { type: 'end_invalid' };
+        }
         return { type: 'question', guid: rule.action.targetQuestionId };
       }
     }
@@ -175,6 +182,9 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     if (nextTarget) {
       if (nextTarget === '__end__') {
         return { type: 'end' };
+      }
+      if (nextTarget === '__invalid_end__') {
+        return { type: 'end_invalid' };
       }
       const targetExists = sortedQuestions.some((q) => q.guid === nextTarget);
       if (targetExists) {
@@ -238,10 +248,17 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     // Check if current question is required and answered
     if (currentQuestion && currentQuestion.required) {
       if (!isQuestionAnswered(currentQuestion)) {
-        // Required question not answered, cannot proceed
-        return;
+        // 1st click: warn user, 2nd click (same question) allows skip
+        if (requiredSkipArmedGuid !== currentGuid) {
+          setRequiredSkipArmedGuid(currentGuid);
+          setShowRequiredSkipToast(true);
+          window.setTimeout(() => setShowRequiredSkipToast(false), 1800);
+          return;
+        }
       }
     }
+
+    setRequiredSkipArmedGuid(null);
 
     // Check control question if applicable
     if (currentQuestion) {
@@ -251,6 +268,13 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     const result = resolveNext(currentGuid);
 
     if (result.type === 'end') {
+      setEndedInvalid(false);
+      setEnded(true);
+      return;
+    }
+
+    if (result.type === 'end_invalid') {
+      setEndedInvalid(true);
       setEnded(true);
       return;
     }
@@ -276,9 +300,10 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     if (currentIdx < sortedQuestions.length - 1) {
       setPath((prev) => [...prev, sortedQuestions[currentIdx + 1].guid]);
     } else {
+      setEndedInvalid(false);
       setEnded(true);
     }
-  }, [currentGuid, ended, currentQuestion, answers, textAnswers, ratingAnswers, matrixAnswers, sortedQuestions, conditions, sequentialEdges]);
+  }, [currentGuid, ended, currentQuestion, requiredSkipArmedGuid, answers, textAnswers, ratingAnswers, matrixAnswers, sortedQuestions, conditions, sequentialEdges]);
 
   const goPrev = useCallback(() => {
     if (path.length <= 1) return;
@@ -287,6 +312,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
       return;
     }
     setPath((prev) => prev.slice(0, -1));
+    setRequiredSkipArmedGuid(null);
   }, [path.length, ended]);
 
   /* ── Choice answers ── */
@@ -399,6 +425,9 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     setMatrixAnswers({});
     setSortableAnswers({});
     setEnded(false);
+    setEndedInvalid(false);
+    setRequiredSkipArmedGuid(null);
+    setShowRequiredSkipToast(false);
   }, [sortedQuestions]);
 
   // Check if current question is required and answered
@@ -417,6 +446,8 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     isCompleted,
     isCurrentQuestionRequired,
     isCurrentQuestionAnswered,
+    isSurveyValid,
+    showRequiredSkipToast,
     goNext,
     goPrev,
     // Choice

@@ -65,6 +65,13 @@ export function useSurvey(
 
   const deleteQuestion = useCallback(
     (guid: string) => {
+      const sorted = [...questions].sort((a, b) => a.order - b.order);
+      const idx = sorted.findIndex((q) => q.guid === guid);
+      const prevQ = idx > 0 ? sorted[idx - 1] : null;
+      const nextQ = idx >= 0 && idx < sorted.length - 1 ? sorted[idx + 1] : null;
+      const isFirst = idx === 0;
+      const isLast = idx === sorted.length - 1;
+
       setQuestions((prev) => {
         const filtered = prev.filter((q) => q.guid !== guid);
         return filtered.map((q, i) => ({ ...q, order: i + 1 }));
@@ -80,8 +87,33 @@ export function useSurvey(
       if (selectedId === guid) {
         setSelectedId(null);
       }
+
+      // Remove stale sequential edges touching deleted node and
+      // block auto-reconnected default edges; user will reconnect manually.
+      setSequentialEdges((prev) => {
+        const current = prev ?? {};
+        const blocked = new Set(current.blockedEdges ?? []);
+
+        // Prevent default auto-reconnect after deletion
+        if (prevQ && nextQ) blocked.add(`seq-${prevQ.guid}-${nextQ.guid}`);
+        if (isFirst && nextQ) blocked.add(`seq-__start__-${nextQ.guid}`);
+        if (isLast && prevQ) blocked.add(`seq-${prevQ.guid}-end`);
+
+        const customEdges = (current.customEdges ?? []).filter(
+          (e) => e.source !== guid && e.target !== guid,
+        );
+        const cleanedBlocked = Array.from(blocked).filter((id) => !id.includes(guid));
+
+        if (customEdges.length === 0 && cleanedBlocked.length === 0) {
+          return undefined;
+        }
+        return {
+          blockedEdges: cleanedBlocked.length > 0 ? cleanedBlocked : undefined,
+          customEdges: customEdges.length > 0 ? customEdges : undefined,
+        };
+      });
     },
-    [selectedId],
+    [questions, selectedId],
   );
 
   const reorderQuestions = useCallback((reordered: Question[]) => {

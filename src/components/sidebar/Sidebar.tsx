@@ -33,7 +33,7 @@ export function Sidebar({
   onUpdateCondition,
 }: SidebarProps) {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       <SidebarTabs activeTab={activeTab} onTabChange={onTabChange} />
 
       {activeTab === 'questions' && (
@@ -47,7 +47,7 @@ export function Sidebar({
             </p>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 pt-3 pb-3">
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-3 pb-24">
             <QuestionList
               questions={questions}
               selectedId={selectedId}
@@ -59,9 +59,9 @@ export function Sidebar({
             />
           </div>
 
-          <div className="p-3 border-t border-base-300/40">
+          <div className="sticky bottom-0 z-10 p-3 border-t border-base-300/40 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/80">
             <button
-              className="btn btn-primary btn-block btn-sm rounded-xl"
+              className="btn btn-primary btn-block btn-sm rounded-xl shadow-sm"
               onClick={onAdd}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

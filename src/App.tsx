@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { BuilderPage } from './components/builder/BuilderPage';
 import { useSurveyStore } from './hooks/useSurveyStore';
@@ -8,12 +8,42 @@ type Page =
   | { type: 'dashboard' }
   | { type: 'builder'; surveyId: string };
 
+const PAGE_KEY = 'vs:page';
+
+function loadPage(): Page {
+  try {
+    const raw = localStorage.getItem(PAGE_KEY);
+    if (!raw) return { type: 'dashboard' };
+    const parsed = JSON.parse(raw) as Page;
+    if (parsed?.type === 'builder' && parsed.surveyId) return parsed;
+    return { type: 'dashboard' };
+  } catch {
+    return { type: 'dashboard' };
+  }
+}
+
+function savePage(page: Page) {
+  try {
+    localStorage.setItem(PAGE_KEY, JSON.stringify(page));
+  } catch { /* ignore */ }
+}
+
 export default function App() {
-  const [page, setPage] = useState<Page>({ type: 'dashboard' });
+  const [page, setPageState] = useState<Page>(() => loadPage());
   const { surveys, createSurvey, createDemoSurvey, updateSurvey, deleteSurvey, getSurvey } =
     useSurveyStore();
-  
 
+  const setPage = useCallback((p: Page) => {
+    savePage(p);
+    setPageState(p);
+  }, []);
+
+  // If persisted page points to a builder but survey no longer exists, fall back to dashboard
+  useEffect(() => {
+    if (page.type === 'builder' && !getSurvey(page.surveyId)) {
+      setPage({ type: 'dashboard' });
+    }
+  }, [page, getSurvey, setPage]);
 
   const handleCreateNew = () => {
     const newSurvey = createSurvey();
@@ -42,10 +72,7 @@ export default function App() {
 
   if (page.type === 'builder') {
     const survey = getSurvey(page.surveyId);
-    if (!survey) {
-      setPage({ type: 'dashboard' });
-      return null;
-    }
+    if (!survey) return null; // useEffect will redirect
     return (
       <BuilderPage
         key={survey.id}
@@ -64,6 +91,5 @@ export default function App() {
       onOpenSurvey={handleOpenSurvey}
       onDeleteSurvey={deleteSurvey}
     />
-
   );
 }

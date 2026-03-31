@@ -36,8 +36,10 @@ export function ConditionEditorModal({
   const [answerValue, setAnswerValue] = useState(initialAnswer ?? '');
   const [rowIndex, setRowIndex] = useState(initialRowIndex ?? 0);
 
-  const [actionType, setActionType] = useState<'jump_to' | 'end_survey'>(
-    initialAction?.type ?? 'jump_to',
+  const [actionType, setActionType] = useState<'jump_to' | 'end_survey' | 'invalid_end'>(
+    initialAction?.type === 'jump_to' && initialAction.targetQuestionId === '__invalid_end__'
+      ? 'invalid_end'
+      : (initialAction?.type ?? 'jump_to'),
   );
   const [targetQuestionId, setTargetQuestionId] = useState<string>(
     initialAction?.type === 'jump_to'
@@ -63,7 +65,9 @@ export function ConditionEditorModal({
     const action: ConditionAction =
       actionType === 'end_survey'
         ? { type: 'end_survey' }
-        : { type: 'jump_to', targetQuestionId };
+        : actionType === 'invalid_end'
+          ? { type: 'jump_to', targetQuestionId: '__invalid_end__' }
+          : { type: 'jump_to', targetQuestionId };
 
     const answer = !needsValue ? '*' : answerValue;
 
@@ -78,14 +82,14 @@ export function ConditionEditorModal({
   };
 
   const isValid = (() => {
-    if (!needsValue && operator !== 'any') return actionType === 'end_survey' || !!targetQuestionId;
-    if (operator === 'any') return actionType === 'end_survey' || !!targetQuestionId;
+    if (!needsValue && operator !== 'any') return actionType === 'end_survey' || actionType === 'invalid_end' || !!targetQuestionId;
+    if (operator === 'any') return actionType === 'end_survey' || actionType === 'invalid_end' || !!targetQuestionId;
     if (!answerValue && needsValue) return false;
-    return actionType === 'end_survey' || !!targetQuestionId;
+    return actionType === 'end_survey' || actionType === 'invalid_end' || !!targetQuestionId;
   })();
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+    <div className="fixed inset-0 z-60 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative bg-base-100 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-fade-slide-in">
@@ -151,7 +155,7 @@ export function ConditionEditorModal({
             <label className="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-2 block">
               Aksiyon
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 className={`
                   flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all
@@ -184,6 +188,23 @@ export function ConditionEditorModal({
                 </svg>
                 Anketi Bitir
               </button>
+              <button
+                className={`
+                  flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all
+                  ${actionType === 'invalid_end'
+                    ? 'border-warning bg-warning/10 text-warning'
+                    : 'border-base-300/50 text-base-content/50 hover:border-base-300'
+                  }
+                `}
+                onClick={() => setActionType('invalid_end')}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v4" />
+                  <path d="M12 16h.01" />
+                </svg>
+                Geçersiz Bitir
+              </button>
             </div>
           </div>
 
@@ -203,7 +224,7 @@ export function ConditionEditorModal({
                 >
                   {targetOptions.map((q) => (
                     <option key={q.guid} value={q.guid}>
-                      S{q.order}: {q.text || 'İsimsiz soru'}
+                      {`S${q.order}: ${q.text || 'İsimsiz soru'}`}
                     </option>
                   ))}
                 </select>

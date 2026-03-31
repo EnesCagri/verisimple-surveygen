@@ -1,30 +1,51 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Survey, Question, ConditionalRule, NodePositions, SequentialEdges } from '../../types/survey';
-import { AppLayout } from '../layout/AppLayout';
-import { TopBar } from '../layout/TopBar';
-import { Sidebar } from '../sidebar/Sidebar';
-import { EditorPanel } from '../editor/EditorPanel';
-import { FlowCanvas } from '../flow/FlowCanvas';
-import { JsonPreviewModal } from '../modals/JsonPreviewModal';
-import { PreviewPage } from '../preview/PreviewPage';
-import { AIChatPanel } from '../ai/AIChatPanel';
-import { useSurvey } from '../../hooks/useSurvey';
-import { useAIChat } from '../../hooks/useAIChat';
-import { isBridgeAvailable, bridgeSave, bridgeNotifyChange } from '../../bridge/bridge';
-import type { SurveyMutators } from '../../utils/aiActions';
-import type { SidebarTab } from '../sidebar/SidebarTabs';
+import { useState, useEffect, useCallback, useRef } from "react";
+import type {
+  Survey,
+  Question,
+  ConditionalRule,
+  NodePositions,
+  SequentialEdges,
+} from "../../types/survey";
+import { AppLayout } from "../layout/AppLayout";
+import { TopBar } from "../layout/TopBar";
+import { Sidebar } from "../sidebar/Sidebar";
+import { EditorPanel } from "../editor/EditorPanel";
+import { FlowCanvas } from "../flow/FlowCanvas";
+import { PreviewPage } from "../preview/PreviewPage";
+import { AIChatPanel } from "../ai/AIChatPanel";
+import { useSurvey } from "../../hooks/useSurvey";
+import { useAIChat } from "../../hooks/useAIChat";
+import {
+  isBridgeAvailable,
+  bridgeSave,
+  bridgeNotifyChange,
+} from "../../bridge/bridge";
+import type { SurveyMutators } from "../../utils/aiActions";
+import type { SidebarTab } from "../sidebar/SidebarTabs";
 
 interface BuilderPageProps {
   survey: Survey;
   onSave: (
     id: string,
-    updates: { title: string; questions: Question[]; conditions: ConditionalRule[]; nodePositions?: NodePositions; sequentialEdges?: SequentialEdges },
+    updates: {
+      title: string;
+      questions: Question[];
+      conditions: ConditionalRule[];
+      nodePositions?: NodePositions;
+      sequentialEdges?: SequentialEdges;
+    },
   ) => void;
   onBack: () => void;
 }
 
 export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
-  const surveyHook = useSurvey(survey.title, survey.questions, survey.conditions ?? [], survey.nodePositions, survey.sequentialEdges);
+  const surveyHook = useSurvey(
+    survey.title,
+    survey.questions,
+    survey.conditions ?? [],
+    survey.nodePositions,
+    survey.sequentialEdges,
+  );
 
   const {
     title,
@@ -47,16 +68,17 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
     replaceAll,
     updateNodePositions,
     updateSequentialEdges,
-    toJSON,
     getSurveyPayload,
   } = surveyHook;
 
-  const [activeTab, setActiveTab] = useState<SidebarTab>('questions');
-  const [jsonModalOpen, setJsonModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<SidebarTab>("questions");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [aiChatOpen, setAIChatOpen] = useState(false);
   const [bridgeSaving, setBridgeSaving] = useState(false);
-  const [bridgeMessage, setBridgeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [bridgeMessage, setBridgeMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // Refs for live state getters (avoids stale closures in useAIChat)
   const questionsRef = useRef(questions);
@@ -71,23 +93,34 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
   const getTitle = useCallback(() => titleRef.current, []);
 
   // Build mutators object for AI actions
-  const mutators: SurveyMutators = useCallback(() => ({
-    setTitle,
-    addQuestionWithData,
-    updateQuestion,
-    deleteQuestion,
-    addCondition,
-    updateCondition,
-    removeCondition,
-    replaceAll,
-    reorderQuestions,
-    getQuestions,
-    getConditions,
-  }), [
-    setTitle, addQuestionWithData, updateQuestion, deleteQuestion,
-    addCondition, updateCondition, removeCondition, replaceAll,
-    reorderQuestions, getQuestions, getConditions,
-  ])();
+  const mutators: SurveyMutators = useCallback(
+    () => ({
+      setTitle,
+      addQuestionWithData,
+      updateQuestion,
+      deleteQuestion,
+      addCondition,
+      updateCondition,
+      removeCondition,
+      replaceAll,
+      reorderQuestions,
+      getQuestions,
+      getConditions,
+    }),
+    [
+      setTitle,
+      addQuestionWithData,
+      updateQuestion,
+      deleteQuestion,
+      addCondition,
+      updateCondition,
+      removeCondition,
+      replaceAll,
+      reorderQuestions,
+      getQuestions,
+      getConditions,
+    ],
+  )();
 
   const {
     messages,
@@ -106,13 +139,32 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
 
   // Auto-save on changes (local store + bridge notification)
   useEffect(() => {
-    onSave(survey.id, { title, questions, conditions, nodePositions, sequentialEdges });
+    onSave(survey.id, {
+      title,
+      questions,
+      conditions,
+      nodePositions,
+      sequentialEdges,
+    });
     bridgeNotifyChange(getSurveyPayload(survey.id));
-  }, [title, questions, conditions, nodePositions, sequentialEdges, survey.id, onSave, getSurveyPayload]);
+  }, [
+    title,
+    questions,
+    conditions,
+    nodePositions,
+    sequentialEdges,
+    survey.id,
+    onSave,
+    getSurveyPayload,
+  ]);
 
   const handleSave = useCallback(async () => {
     if (!isBridgeAvailable()) {
-      setJsonModalOpen(true);
+      setBridgeMessage({
+        type: "error",
+        text: "Bridge bulunamadı. Kaydetme işlemi yapılamadı.",
+      });
+      setTimeout(() => setBridgeMessage(null), 4000);
       return;
     }
 
@@ -122,19 +174,23 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
     setBridgeSaving(false);
 
     if (response.success) {
-      setBridgeMessage({ type: 'success', text: response.message ?? 'Kaydedildi! Yönlendiriliyorsunuz…' });
-      setTimeout(() => {
-        window.location.href = '/SurveyEngine/Saved?surveyId=' + encodeURIComponent(survey.id);
-      }, 1200);
+      setBridgeMessage({
+        type: "success",
+        text: response.message ?? "Kaydedildi!",
+      });
+      setTimeout(() => setBridgeMessage(null), 2500);
     } else {
-      setBridgeMessage({ type: 'error', text: response.message ?? 'Kaydetme hatası.' });
+      setBridgeMessage({
+        type: "error",
+        text: response.message ?? "Kaydetme hatası.",
+      });
       setTimeout(() => setBridgeMessage(null), 4000);
     }
   }, [survey.id, getSurveyPayload]);
 
   // When switching to flow tab, show the flow canvas in main area
   const mainContent =
-    activeTab === 'flow' ? (
+    activeTab === "flow" ? (
       <FlowCanvas
         questions={questions}
         conditions={conditions}
@@ -144,6 +200,7 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
         onUpdateCondition={updateCondition}
         onRemoveCondition={removeCondition}
         onSelectQuestion={selectQuestion}
+        onDeleteQuestion={deleteQuestion}
         onNodePositionsChange={updateNodePositions}
         onSequentialEdgesChange={updateSequentialEdges}
       />
@@ -188,11 +245,13 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
 
       {/* Bridge save toast */}
       {bridgeMessage && (
-        <div className={`fixed bottom-6 right-6 z-9999 px-5 py-3 rounded-xl shadow-lg text-sm font-semibold transition-all ${
-          bridgeMessage.type === 'success'
-            ? 'bg-green-600 text-white'
-            : 'bg-red-600 text-white'
-        }`}>
+        <div
+          className={`fixed bottom-6 right-6 z-9999 px-5 py-3 rounded-xl shadow-lg text-sm font-semibold transition-all ${
+            bridgeMessage.type === "success"
+              ? "bg-green-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
           {bridgeMessage.text}
         </div>
       )}
@@ -202,12 +261,6 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
           Kaydediliyor…
         </div>
       )}
-
-      <JsonPreviewModal
-        open={jsonModalOpen}
-        json={toJSON()}
-        onClose={() => setJsonModalOpen(false)}
-      />
 
       {previewOpen && (
         <PreviewPage
