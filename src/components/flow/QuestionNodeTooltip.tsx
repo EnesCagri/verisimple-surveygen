@@ -323,7 +323,7 @@ function MatrixDetails({ settings }: { settings?: QuestionSettings }) {
 }
 
 function SortableDetails({ answers }: { answers: string[] }) {
-  const items = answers.filter(Boolean);
+  const items = (Array.isArray(answers) ? answers : []).filter(Boolean);
 
   if (items.length === 0) {
     return <span className="text-[11px] text-neutral-content/40 italic">Sıralama öğesi eklenmemiş</span>;

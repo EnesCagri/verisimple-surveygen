@@ -25,9 +25,9 @@ function SparkleIcon({ size = 16 }: { size?: number }) {
 // ── Typing dots animation ──
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-        <SparkleIcon size={14} />
+    <div className="flex items-center gap-3.5 px-5 py-3.5">
+      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+        <SparkleIcon size={16} />
       </div>
       <div className="flex items-center gap-1">
         <span className="w-2 h-2 rounded-full bg-primary/40 animate-bounce [animation-delay:0ms]" />
@@ -53,11 +53,11 @@ function MessageBubble({
   const isUser = message.role === 'user';
 
   return (
-    <div className={`flex gap-2.5 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
       {/* Avatar */}
       {!isUser && (
-        <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
-          <SparkleIcon size={14} />
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
+          <SparkleIcon size={16} />
         </div>
       )}
 
@@ -65,7 +65,7 @@ function MessageBubble({
         {/* Bubble */}
         <div
           className={`
-            px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed
+            px-4 py-3 rounded-2xl text-sm leading-relaxed
             ${isUser
               ? 'bg-primary text-primary-content rounded-br-md'
               : 'bg-base-200/80 text-base-content/80 rounded-bl-md'
@@ -78,7 +78,7 @@ function MessageBubble({
         {/* Action badges (AI only) */}
         {!isUser && message.appliedCount !== undefined && message.appliedCount > 0 && (
           <div className="flex items-center gap-1.5 px-1">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-success/10 text-success">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success/10 text-success">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 6 9 17l-5-5" />
               </svg>
@@ -91,7 +91,7 @@ function MessageBubble({
         {!isUser && message.undoState === 'pending' && (
           <div className="flex items-center gap-2 px-1 mt-1">
             <button
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold bg-success/10 text-success hover:bg-success/20 border border-success/20 transition-all duration-200"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-success/10 text-success hover:bg-success/20 border border-success/20 transition-all duration-200"
               onClick={() => onKeep?.(message.id)}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -100,7 +100,7 @@ function MessageBubble({
               Koru
             </button>
             <button
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold bg-error/10 text-error hover:bg-error/20 border border-error/20 transition-all duration-200"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-error/10 text-error hover:bg-error/20 border border-error/20 transition-all duration-200"
               onClick={() => onUndo?.(message.id)}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -117,7 +117,7 @@ function MessageBubble({
         {!isUser && message.undoState === 'kept' && message.snapshot && (
           <div className="flex flex-col gap-1.5 px-1">
             <div className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-success/10 text-success/60">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success/10 text-success/60">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 6 9 17l-5-5" />
                 </svg>
@@ -125,7 +125,7 @@ function MessageBubble({
               </span>
             </div>
             <button
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold bg-error/10 text-error hover:bg-error/20 border border-error/20 transition-all duration-200 w-fit"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-error/10 text-error hover:bg-error/20 border border-error/20 transition-all duration-200 w-fit"
               onClick={() => onUndo?.(message.id)}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -141,7 +141,7 @@ function MessageBubble({
         {!isUser && message.undoState === 'undone' && (
           <div className="flex flex-col gap-1.5 px-1">
             <div className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-warning/10 text-warning/70">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-warning/10 text-warning/70">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 7v6h6" />
                   <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
@@ -151,7 +151,7 @@ function MessageBubble({
             </div>
             {onRedo && message.snapshot && (
               <button
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all duration-200 w-fit"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all duration-200 w-fit"
                 onClick={() => onRedo?.(message.id)}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -168,7 +168,7 @@ function MessageBubble({
         {!isUser && message.errors && message.errors.length > 0 && (
           <div className="flex flex-col gap-0.5 px-1">
             {message.errors.map((err, i) => (
-              <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-error/10 text-error">
+              <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-error/10 text-error">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <path d="M12 8v4" />
@@ -181,7 +181,7 @@ function MessageBubble({
         )}
 
         {/* Timestamp */}
-        <span className="text-[9px] text-base-content/25 px-1">
+        <span className="text-[10px] text-base-content/30 px-1">
           {new Date(message.timestamp).toLocaleTimeString('tr-TR', {
             hour: '2-digit',
             minute: '2-digit',
@@ -207,15 +207,15 @@ const suggestions = [
 
 function SuggestionChips({ onSelect }: { onSelect: (text: string) => void }) {
   return (
-    <div className="flex flex-col gap-2 p-4">
-      <p className="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider">
+    <div className="flex flex-col gap-2.5 p-5">
+      <p className="text-xs font-semibold text-base-content/45 uppercase tracking-wide">
         Öneriler
       </p>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {suggestions.map((s) => (
           <button
             key={s}
-            className="px-3 py-1.5 rounded-xl text-[11px] font-medium bg-base-200/80 text-base-content/50 hover:bg-primary/10 hover:text-primary transition-colors text-left"
+            className="px-3.5 py-2 rounded-xl text-xs font-medium bg-base-200/80 text-base-content/50 hover:bg-primary/10 hover:text-primary transition-colors text-left"
             onClick={() => onSelect(s)}
           >
             {s}
@@ -281,7 +281,7 @@ export function AIChatPanel({
       {/* Drawer */}
       <div
         className={`
-          fixed top-0 right-0 h-full w-[400px] z-50
+          fixed top-0 right-0 h-full w-[min(460px,42vw)] min-w-[320px] z-50
           bg-base-100 border-l border-base-300/40 shadow-2xl
           flex flex-col
           transition-transform duration-300 ease-out
@@ -289,24 +289,24 @@ export function AIChatPanel({
         `}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-base-300/40">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-              <SparkleIcon size={18} />
+        <div className="flex items-center justify-between px-5 py-4 border-b border-base-300/40">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+              <SparkleIcon size={20} />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-base-content/80">AI Asistan</h3>
-              <p className="text-[10px] text-base-content/40">Gemini ile anket oluştur</p>
+              <h3 className="text-base font-semibold text-base-content/80">AI Asistan</h3>
+              <p className="text-xs text-base-content/45">Gemini ile anket oluştur</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
             {messages.length > 0 && (
               <button
-                className="p-1.5 rounded-lg hover:bg-base-200 text-base-content/30 hover:text-base-content/50 transition-colors"
+                className="p-2 rounded-lg hover:bg-base-200 text-base-content/30 hover:text-base-content/50 transition-colors"
                 onClick={onClear}
                 title="Sohbeti temizle"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 6h18" />
                   <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
                   <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
@@ -314,11 +314,11 @@ export function AIChatPanel({
               </button>
             )}
             <button
-              className="p-1.5 rounded-lg hover:bg-base-200 text-base-content/30 hover:text-base-content/50 transition-colors"
+              className="p-2 rounded-lg hover:bg-base-200 text-base-content/30 hover:text-base-content/50 transition-colors"
               onClick={onClose}
               title="Kapat"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -331,21 +331,21 @@ export function AIChatPanel({
           {messages.length === 0 && !isLoading ? (
             <div className="flex flex-col h-full">
               {/* Welcome */}
-              <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-4">
-                  <SparkleIcon size={28} />
+              <div className="flex-1 flex flex-col items-center justify-center px-7 py-9">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-4">
+                  <SparkleIcon size={30} />
                 </div>
-                <h4 className="text-base font-semibold text-base-content/70 mb-1">
+                <h4 className="text-lg font-semibold text-base-content/70 mb-1.5">
                   Merhaba!
                 </h4>
-                <p className="text-[12px] text-base-content/40 text-center leading-relaxed max-w-[260px]">
+                <p className="text-sm text-base-content/45 text-center leading-relaxed max-w-[300px]">
                   Doğal dilde anket oluşturmanıza yardımcı olabilirim. Soru ekleyin, koşullar tanımlayın veya komple bir anket oluşturun.
                 </p>
               </div>
               <SuggestionChips onSelect={(t) => { setInput(t); inputRef.current?.focus(); }} />
             </div>
           ) : (
-            <div className="flex flex-col gap-4 p-4">
+            <div className="flex flex-col gap-4.5 p-5">
               {messages.map((msg) => (
                 <MessageBubble key={msg.id} message={msg} onKeep={onKeep} onUndo={onUndo} onRedo={onRedo} />
               ))}
@@ -356,8 +356,8 @@ export function AIChatPanel({
         </div>
 
         {/* Input area */}
-        <div className="border-t border-base-300/40 p-3">
-          <div className="flex items-end gap-2">
+        <div className="border-t border-base-300/40 p-4">
+          <div className="flex items-end gap-2.5">
             <textarea
               ref={inputRef}
               value={input}
@@ -365,7 +365,7 @@ export function AIChatPanel({
               onKeyDown={handleKeyDown}
               placeholder="Anketiniz için bir istek yazın..."
               rows={1}
-              className="flex-1 resize-none bg-base-200/60 border border-base-300/40 rounded-xl px-3.5 py-2.5 text-[13px] text-base-content/80 placeholder:text-base-content/30 focus:border-primary/40 focus:outline-none transition-colors"
+              className="flex-1 resize-none bg-base-200/60 border border-base-300/40 rounded-xl px-4 py-3 text-sm text-base-content/80 placeholder:text-base-content/30 focus:border-primary/40 focus:outline-none transition-colors"
               style={{ maxHeight: '120px' }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
@@ -376,7 +376,7 @@ export function AIChatPanel({
             />
             <button
               className={`
-                shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all
+                shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all
                 ${input.trim() && !isLoading
                   ? 'bg-primary text-primary-content shadow-sm hover:shadow-md'
                   : 'bg-base-200/60 text-base-content/20 cursor-not-allowed'
@@ -385,13 +385,13 @@ export function AIChatPanel({
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />
                 <path d="m21.854 2.147-10.94 10.939" />
               </svg>
             </button>
           </div>
-          <p className="text-[9px] text-base-content/25 mt-1.5 text-center">
+          <p className="text-[10px] text-base-content/30 mt-2 text-center">
             Shift+Enter ile yeni satır · Enter ile gönder
           </p>
         </div>

@@ -97,11 +97,11 @@ export function ConditionList({
           return (
             <div
               key={rule.id}
-              className="group relative bg-base-100 rounded-xl border border-base-300/50 hover:border-primary/40 hover:shadow-md transition-all duration-200 overflow-hidden"
+              className="group relative bg-base-100 rounded-2xl border border-base-300/50 hover:border-primary/40 hover:shadow-md transition-all duration-200 overflow-hidden"
             >
               {/* Header: Kural # */}
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-base-300/30 bg-base-200/40">
-                <span className="text-[10px] font-semibold text-base-content/40 uppercase tracking-wider">
+              <div className="flex items-center justify-between px-4.5 py-3 border-b border-base-300/30 bg-base-200/40">
+                <span className="text-xs font-semibold text-base-content/45 uppercase tracking-wide">
                   Kural #{index + 1}
                 </span>
                 <button
@@ -121,7 +121,7 @@ export function ConditionList({
 
               {/* Main Content: Input -> Logic -> Output */}
               <div
-                className="p-4 cursor-pointer"
+                className="p-4.5 cursor-pointer"
                 onClick={() => setEditingCondition(rule)}
                 onMouseEnter={() => setHoveredQuestionId(rule.sourceQuestionId)}
                 onMouseLeave={() => setHoveredQuestionId(null)}
@@ -129,11 +129,11 @@ export function ConditionList({
                 <div className="flex items-center gap-2.5 flex-wrap">
                   {/* INPUT: Soru */}
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="inline-flex items-center justify-center px-2.5 h-6 rounded-lg text-[11px] font-bold bg-primary/15 text-primary border border-primary/20 shrink-0">
+                    <span className="inline-flex items-center justify-center px-2.5 h-7 rounded-lg text-xs font-bold bg-primary/15 text-primary border border-primary/20 shrink-0">
                       S{srcQuestion?.order ?? '?'}
                     </span>
                     <span
-                      className="text-[12px] font-medium text-base-content/70 truncate"
+                      className="text-sm font-medium text-base-content/75 truncate"
                       title={isHovered ? sourceFullText : undefined}
                     >
                       {isHovered ? sourceFullText : sourceText}
@@ -144,7 +144,7 @@ export function ConditionList({
                   {operator && (
                     <>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[11px] font-semibold text-base-content/40 bg-base-200/60 px-2 py-0.5 rounded-md">
+                        <span className="text-xs font-semibold text-base-content/45 bg-base-200/60 px-2.5 py-1 rounded-md">
                           {operator}
                         </span>
                       </div>
@@ -153,7 +153,7 @@ export function ConditionList({
 
                   {/* Value: Cevap/Değer */}
                   <div className="flex items-center shrink-0">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-neutral/90 text-neutral-content">
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-neutral/90 text-neutral-content">
                       {answerValue}
                     </span>
                   </div>
@@ -176,11 +176,11 @@ export function ConditionList({
                   {/* OUTPUT: Aksiyon */}
                   <div className="flex items-center shrink-0">
                     {rule.action.type === 'end_survey' ? (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-error text-error-content">
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-error text-error-content">
                         Anketi Bitir
                       </span>
                     ) : isInvalidEnd ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-warning/90 text-warning-content">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-warning/90 text-warning-content">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                           <circle cx="12" cy="12" r="10" />
                           <path d="M12 8v4" />
@@ -189,7 +189,7 @@ export function ConditionList({
                         Geçersiz Bitir
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-success/90 text-success-content">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-success/90 text-success-content">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="m9 18 6-6-6-6" />
                         </svg>
@@ -201,7 +201,7 @@ export function ConditionList({
 
                 {/* Natural Language Description (Optional, subtle) */}
                 <div className="mt-2.5 pt-2.5 border-t border-base-300/20">
-                  <p className="text-[10px] text-base-content/40 italic">
+                  <p className="text-xs text-base-content/45 italic">
                     {rule.action.type === 'end_survey' ? (
                       <>Kullanıcı <span className="font-medium text-base-content/50">S{srcQuestion?.order}</span> sorusuna <span className="font-medium text-base-content/50">{answerValue}</span> derse → <span className="font-medium text-error/70">Süreci Sonlandır</span></>
                     ) : isInvalidEnd ? (

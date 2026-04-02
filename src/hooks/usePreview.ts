@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Question, ConditionalRule, SequentialEdges } from '../types/survey';
 import { evaluateCondition } from '../utils/condition';
 
@@ -32,8 +32,25 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
   const [sortableAnswers, setSortableAnswers] = useState<Record<string, string[]>>({});
   const [ended, setEnded] = useState(false);
   const [endedInvalid, setEndedInvalid] = useState(false);
-  const [requiredSkipArmedGuid, setRequiredSkipArmedGuid] = useState<string | null>(null);
-  const [showRequiredSkipToast, setShowRequiredSkipToast] = useState(false);
+  const [skipArmedGuid, setSkipArmedGuid] = useState<string | null>(null);
+  const [skipToast, setSkipToast] = useState<null | { kind: 'reminder' | 'ack' }>(null);
+  const skipToastTimerRef = useRef<number | null>(null);
+
+  const showSkipToast = useCallback((kind: 'reminder' | 'ack') => {
+    if (skipToastTimerRef.current) window.clearTimeout(skipToastTimerRef.current);
+    setSkipToast({ kind });
+    const ms = kind === 'reminder' ? 2800 : 3200;
+    skipToastTimerRef.current = window.setTimeout(() => {
+      setSkipToast(null);
+      skipToastTimerRef.current = null;
+    }, ms);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (skipToastTimerRef.current) window.clearTimeout(skipToastTimerRef.current);
+    };
+  }, []);
   // Control question results: question guid -> { isCorrect: boolean, userAnswer: string[], correctAnswer: string[] }
   const [controlQuestionResults, setControlQuestionResults] = useState<Record<string, { isCorrect: boolean; userAnswer: string[]; correctAnswer: string[] }>>({});
 
@@ -245,20 +262,16 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
   const goNext = useCallback(() => {
     if (!currentGuid || ended) return;
 
-    // Check if current question is required and answered
-    if (currentQuestion && currentQuestion.required) {
-      if (!isQuestionAnswered(currentQuestion)) {
-        // 1st click: warn user, 2nd click (same question) allows skip
-        if (requiredSkipArmedGuid !== currentGuid) {
-          setRequiredSkipArmedGuid(currentGuid);
-          setShowRequiredSkipToast(true);
-          window.setTimeout(() => setShowRequiredSkipToast(false), 1800);
-          return;
-        }
+    if (currentQuestion && !isQuestionAnswered(currentQuestion)) {
+      if (skipArmedGuid !== currentGuid) {
+        setSkipArmedGuid(currentGuid);
+        showSkipToast('reminder');
+        return;
       }
+      showSkipToast('ack');
     }
 
-    setRequiredSkipArmedGuid(null);
+    setSkipArmedGuid(null);
 
     // Check control question if applicable
     if (currentQuestion) {
@@ -303,7 +316,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
       setEndedInvalid(false);
       setEnded(true);
     }
-  }, [currentGuid, ended, currentQuestion, requiredSkipArmedGuid, answers, textAnswers, ratingAnswers, matrixAnswers, sortedQuestions, conditions, sequentialEdges]);
+  }, [currentGuid, ended, currentQuestion, skipArmedGuid, answers, textAnswers, ratingAnswers, matrixAnswers, sortedQuestions, conditions, sequentialEdges, showSkipToast]);
 
   const goPrev = useCallback(() => {
     if (path.length <= 1) return;
@@ -312,7 +325,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
       return;
     }
     setPath((prev) => prev.slice(0, -1));
-    setRequiredSkipArmedGuid(null);
+    setSkipArmedGuid(null);
   }, [path.length, ended]);
 
   /* ── Choice answers ── */
@@ -426,8 +439,9 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     setSortableAnswers({});
     setEnded(false);
     setEndedInvalid(false);
-    setRequiredSkipArmedGuid(null);
-    setShowRequiredSkipToast(false);
+    setSkipArmedGuid(null);
+    setSkipToast(null);
+    if (skipToastTimerRef.current) window.clearTimeout(skipToastTimerRef.current);
   }, [sortedQuestions]);
 
   // Check if current question is required and answered
@@ -447,7 +461,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     isCurrentQuestionRequired,
     isCurrentQuestionAnswered,
     isSurveyValid,
-    showRequiredSkipToast,
+    skipToast,
     goNext,
     goPrev,
     // Choice

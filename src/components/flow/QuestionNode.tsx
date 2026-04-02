@@ -23,7 +23,7 @@ const typeConfig: Record<QuestionType, { label: string; icon: React.JSX.Element 
   [QuestionType.SingleChoice]: {
     label: 'Tek Seçim',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
         <circle cx="12" cy="12" r="3" />
       </svg>
@@ -32,7 +32,7 @@ const typeConfig: Record<QuestionType, { label: string; icon: React.JSX.Element 
   [QuestionType.MultipleChoice]: {
     label: 'Çoklu Seçim',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <path d="m9 12 2 2 4-4" />
       </svg>
@@ -41,7 +41,7 @@ const typeConfig: Record<QuestionType, { label: string; icon: React.JSX.Element 
   [QuestionType.TextEntry]: {
     label: 'Metin Girişi',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 10H3" />
         <path d="M21 6H3" />
         <path d="M21 14H3" />
@@ -52,7 +52,7 @@ const typeConfig: Record<QuestionType, { label: string; icon: React.JSX.Element 
   [QuestionType.Rating]: {
     label: 'Derecelendirme',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
       </svg>
     ),
@@ -60,7 +60,7 @@ const typeConfig: Record<QuestionType, { label: string; icon: React.JSX.Element 
   [QuestionType.MatrixLikert]: {
     label: 'Matrix Likert',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="7" rx="1" />
         <rect x="14" y="3" width="7" height="7" rx="1" />
         <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -71,7 +71,7 @@ const typeConfig: Record<QuestionType, { label: string; icon: React.JSX.Element 
   [QuestionType.Sortable]: {
     label: 'Sıralama',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <line x1="3" y1="6" x2="3" y2="18" /><path d="M3 6l3-3 3 3" /><path d="M3 18l3 3 3-3" />
         <line x1="12" y1="6" x2="21" y2="6" /><line x1="12" y1="12" x2="21" y2="12" /><line x1="12" y1="18" x2="21" y2="18" />
       </svg>
@@ -80,7 +80,7 @@ const typeConfig: Record<QuestionType, { label: string; icon: React.JSX.Element 
   [QuestionType.RichText]: {
     label: 'Zengin Metin',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
         <polyline points="14 2 14 8 20 8" />
         <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
@@ -160,14 +160,14 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
     >
       <div
         className={`
-          group bg-base-100 rounded-2xl border-2 shadow-lg min-w-[220px] max-w-[280px]
+          group bg-base-100 rounded-2xl border-2 shadow-lg min-w-[300px] max-w-[360px]
           transition-all duration-200
           ${selected ? 'border-primary shadow-primary/20' : 'border-base-300/50 hover:border-primary/40'}
         `}
       >
         {onDelete && (
           <button
-            className={`absolute -top-2 -right-2 z-20 flex items-center justify-center w-6 h-6 rounded-full border border-error/25 bg-error text-white shadow-sm transition-all ${
+            className={`absolute -top-2.5 -right-2.5 z-20 flex items-center justify-center w-7 h-7 rounded-full border border-error/25 bg-error text-white shadow-sm transition-all ${
               selected ? 'opacity-100 scale-100' : 'opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100'
             }`}
             title="Soruyu sil"
@@ -176,7 +176,7 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
               onDelete(guid);
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -186,29 +186,30 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
         <Handle
           type="target"
           position={Position.Top}
-          className="w-3! h-3! bg-primary! border-2! border-base-100! -top-1.5!"
+          className="w-12! h-8! bg-transparent! border-0! -top-4! cursor-crosshair"
         />
+        <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-1.5 z-10 w-3.5 h-3.5 rounded-full bg-primary border-2 border-base-100 transition-transform duration-150 group-hover:scale-110" />
 
         {/* Header */}
-        <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-          <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 text-primary text-xs font-bold">
+        <div className="flex items-center gap-3 px-5 pt-4 pb-3">
+          <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary text-base font-bold">
             {order}
           </span>
-          <div className="flex items-center gap-1.5 text-[11px] text-base-content/40 font-medium">
+          <div className="flex items-center gap-1.5 text-sm text-base-content/45 font-medium">
             {config.icon}
             {config.label}
           </div>
           {/* Condition indicator */}
           {conditions.length > 0 && (
-            <span className="ml-auto flex items-center justify-center w-5 h-5 rounded-full bg-warning/15 text-[10px] font-bold text-warning">
+            <span className="ml-auto flex items-center justify-center w-7 h-7 rounded-full bg-warning/15 text-sm font-bold text-warning">
               {conditions.length}
             </span>
           )}
         </div>
 
         {/* Question text */}
-        <div className="px-4 pb-3">
-          <p className="text-sm font-medium text-base-content/80 leading-snug line-clamp-2">
+        <div className="px-5 pb-4">
+          <p className="text-lg font-medium text-base-content/80 leading-snug line-clamp-2">
             {text || 'Soru metni...'}
           </p>
         </div>
@@ -216,8 +217,9 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
         <Handle
           type="source"
           position={Position.Bottom}
-          className="w-3! h-3! bg-primary! border-2! border-base-100! -bottom-1.5!"
+          className="w-12! h-8! bg-transparent! border-0! -bottom-4! cursor-crosshair"
         />
+        <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-1.5 z-10 w-3.5 h-3.5 rounded-full bg-primary border-2 border-base-100 transition-transform duration-150 group-hover:scale-110" />
       </div>
 
       {/* Rich tooltip on hover (portal to avoid ReactFlow stacking contexts) */}

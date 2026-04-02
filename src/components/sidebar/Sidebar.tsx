@@ -38,16 +38,26 @@ export function Sidebar({
 
       {activeTab === 'questions' && (
         <>
-          <div className="px-5 py-4">
-            <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wider">
+          <div className="px-5 py-4.5 border-b border-base-300/30">
+            <p className="text-sm font-semibold text-base-content/40 uppercase tracking-wide">
               Sorular
               {questions.length > 0 && (
                 <span className="ml-1.5 text-primary/60">{questions.length}</span>
               )}
             </p>
+            <button
+              className="btn btn-primary btn-block btn-sm rounded-xl shadow-sm mt-3"
+              onClick={onAdd}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Soru Ekle
+            </button>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-3 pb-24">
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-3 pb-3">
             <QuestionList
               questions={questions}
               selectedId={selectedId}
@@ -58,26 +68,13 @@ export function Sidebar({
               onUpdate={onUpdate}
             />
           </div>
-
-          <div className="sticky bottom-0 z-10 p-3 border-t border-base-300/40 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/80">
-            <button
-              className="btn btn-primary btn-block btn-sm rounded-xl shadow-sm"
-              onClick={onAdd}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Soru Ekle
-            </button>
-          </div>
         </>
       )}
 
       {activeTab === 'flow' && (
         <>
-          <div className="px-5 py-4">
-            <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wider">
+          <div className="px-5 py-4.5">
+            <p className="text-sm font-semibold text-base-content/40 uppercase tracking-wide">
               Koşullar
               {conditions.length > 0 && (
                 <span className="ml-1.5 text-primary/60">{conditions.length}</span>

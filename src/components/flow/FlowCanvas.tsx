@@ -59,7 +59,7 @@ function buildConditionSummaries(
   conditions: ConditionalRule[],
   questions: Question[],
 ): ConditionSummary[] {
-  return conditions
+  return (conditions ?? [])
     .filter((c) => c.sourceQuestionId === questionGuid)
     .map((rule) => {
       const srcQ = questions.find((q) => q.guid === rule.sourceQuestionId);
@@ -130,7 +130,7 @@ function buildNodes(
         order: q.order,
         text: q.text,
         type: q.type,
-        answers: q.answers,
+        answers: Array.isArray(q.answers) ? q.answers : [],
         guid: q.guid,
         settings: q.settings,
         conditions: condSummaries,
@@ -207,14 +207,14 @@ function buildEdges(questions: Question[], conditions: ConditionalRule[], sequen
       animated: false,
       style: {
         stroke: color,
-        strokeWidth: isStart ? 2.5 : 2,
+        strokeWidth: isStart ? 3 : 2.4,
         strokeDasharray: isStart ? undefined : '6 4',
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color,
-        width: 16,
-        height: 16,
+        width: 18,
+        height: 18,
       },
     });
     seqSourceUsed.add(source);
@@ -252,7 +252,7 @@ function buildEdges(questions: Question[], conditions: ConditionalRule[], sequen
   }
 
   // 5. Conditional edges (these are separate and always shown)
-  conditions.forEach((rule) => {
+  (conditions ?? []).forEach((rule) => {
     const target =
       rule.action.type === 'end_survey'
         ? END_NODE_ID
@@ -274,16 +274,16 @@ function buildEdges(questions: Question[], conditions: ConditionalRule[], sequen
       type: 'smoothstep',
       animated: true,
       label,
-      labelStyle: { fontSize: 11, fontWeight: 600, fill: color },
+      labelStyle: { fontSize: 13, fontWeight: 700, fill: color },
       labelBgStyle: { fill: 'white', fillOpacity: 0.9 },
-      labelBgPadding: [6, 4] as [number, number],
-      labelBgBorderRadius: 6,
-      style: { stroke: color, strokeWidth: 2.5 },
+      labelBgPadding: [8, 5] as [number, number],
+      labelBgBorderRadius: 8,
+      style: { stroke: color, strokeWidth: 2.8 },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color,
-        width: 16,
-        height: 16,
+        width: 18,
+        height: 18,
       },
     });
   });
@@ -736,42 +736,42 @@ export function FlowCanvas({
         />
         <Controls
           showInteractive={false}
-          className="bg-base-100! border-base-300/40! rounded-xl! shadow-lg!"
+          className="bg-base-100! border-base-300/40! rounded-xl! shadow-lg! scale-110 origin-bottom-left"
         />
       </ReactFlow>
 
       {/* Connection type chooser (sequential vs conditional) */}
       {connTypeMenu && (
         <div
-          className="absolute z-50 bg-base-100 rounded-xl shadow-xl border border-base-300/40 p-2 min-w-[200px]"
+          className="absolute z-50 bg-base-100 rounded-xl shadow-xl border border-base-300/40 p-2.5 min-w-[230px]"
           style={{ left: connTypeMenu.x, top: connTypeMenu.y }}
         >
-          <p className="text-xs font-semibold text-base-content/60 px-3 py-1.5 uppercase tracking-wide">
+          <p className="text-sm font-semibold text-base-content/60 px-3.5 py-2 uppercase tracking-wide">
             Bağlantı Türü Seçin
           </p>
           <button
-            className="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg hover:bg-base-200 transition-colors text-sm"
+            className="flex items-center gap-3 w-full text-left px-3.5 py-2.5 rounded-lg hover:bg-base-200 transition-colors text-base"
             onClick={handleCreateSequential}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(65% 0.19 281)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(65% 0.19 281)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
             </svg>
             <span className="font-medium">Sıralı Bağlantı</span>
-            <span className="text-xs text-base-content/40 ml-auto">Doğrudan geçiş</span>
+            <span className="text-sm text-base-content/40 ml-auto">Doğrudan geçiş</span>
           </button>
           <button
-            className="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg hover:bg-base-200 transition-colors text-sm"
+            className="flex items-center gap-3 w-full text-left px-3.5 py-2.5 rounded-lg hover:bg-base-200 transition-colors text-base"
             onClick={handleCreateCondition}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(65% 0.2 25)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(65% 0.2 25)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" /><path d="m15 9 6-6" />
             </svg>
             <span className="font-medium">Koşullu Bağlantı</span>
-            <span className="text-xs text-base-content/40 ml-auto">Kurala göre</span>
+            <span className="text-sm text-base-content/40 ml-auto">Kurala göre</span>
           </button>
           <div className="border-t border-base-300/30 mt-1 pt-1">
             <button
-              className="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg hover:bg-base-200 transition-colors text-sm text-base-content/50"
+              className="flex items-center gap-2.5 w-full text-left px-3.5 py-2.5 rounded-lg hover:bg-base-200 transition-colors text-base text-base-content/50"
               onClick={() => setConnTypeMenu(null)}
             >
               İptal
@@ -795,17 +795,17 @@ export function FlowCanvas({
         <>
           <div className="fixed inset-0 z-55" onClick={() => setNodeMenu(null)} />
           <div
-            className="absolute z-56 bg-base-100 rounded-xl shadow-xl border border-base-300/40 py-1.5 min-w-[160px] animate-fade-slide-in"
+            className="absolute z-56 bg-base-100 rounded-xl shadow-xl border border-base-300/40 py-2 min-w-[180px] animate-fade-slide-in"
             style={{ left: nodeMenu.x, top: nodeMenu.y }}
           >
             <button
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-error/80 hover:bg-error/5 hover:text-error transition-colors"
+              className="w-full flex items-center gap-3 px-4.5 py-3 text-base text-error/80 hover:bg-error/5 hover:text-error transition-colors"
               onClick={() => {
                 onDeleteQuestion?.(nodeMenu.id);
                 setNodeMenu(null);
               }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 6h18" />
                 <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
                 <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />

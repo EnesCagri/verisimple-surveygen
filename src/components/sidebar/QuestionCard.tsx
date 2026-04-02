@@ -120,17 +120,17 @@ export function QuestionCard({
     <div
       ref={ref}
       className={`
-        group relative rounded-xl bg-base-100 cursor-pointer
+        group relative rounded-2xl bg-base-100 cursor-pointer
         transition-all duration-200 ease-out
         ${isSelected
-          ? 'shadow-md ring-2 ring-primary/50 bg-primary/[0.03]'
+          ? 'shadow-md ring-2 ring-primary/50 bg-primary/3'
           : 'shadow-sm hover:shadow-md border border-base-300/60 hover:border-primary/30'
         }
         ${isDragging ? 'opacity-40 scale-[0.97] rotate-1' : ''}
       `}
       onClick={() => onSelect(question.guid)}
     >
-      <div className="flex items-start gap-2.5 p-3">
+      <div className="flex items-start gap-3 p-3.5">
         {/* Drag handle */}
         <div className="pt-1.5 cursor-grab active:cursor-grabbing">
           <GripIcon />
@@ -139,18 +139,18 @@ export function QuestionCard({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-primary/10 text-primary text-xs font-bold shrink-0">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary text-sm font-bold shrink-0">
               {question.order}
             </span>
-            <span className="text-[13px] font-medium truncate text-base-content/80">
+            <span className="text-sm font-semibold truncate text-base-content/80">
               {question.text || 'Yeni Soru'}
             </span>
           </div>
 
           {/* Type badge with tooltip */}
-          <div className="pl-7">
+          <div className="pl-8">
             <Tooltip content={questionTypeDescriptions[question.type]} position="bottom" delay={400}>
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-base-content/40 bg-base-200/60 rounded-lg px-2 py-0.5 cursor-default">
+              <span className="inline-flex items-center gap-1.5 text-xs text-base-content/45 bg-base-200/70 rounded-lg px-2.5 py-1 cursor-default">
                 <span className="text-base-content/30">{typeIcons[question.type]}</span>
                 {typeLabels[question.type]}
                 {detail && (
@@ -165,17 +165,17 @@ export function QuestionCard({
 
           {/* Required toggle row */}
           <div
-            className="pl-7 mt-2 flex items-center gap-2 w-fit cursor-pointer"
+            className="pl-8 mt-2.5 flex items-center gap-2.5 w-fit cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
               onUpdate?.(question.guid, { required: !question.required });
             }}
           >
             {/* Custom mini switch */}
-            <div className={`relative w-8 h-4 rounded-full transition-colors duration-200 flex-shrink-0 ${question.required ? 'bg-error' : 'bg-base-300'}`}>
-              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all duration-200 ${question.required ? 'left-4' : 'left-0.5'}`} />
+            <div className={`relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ${question.required ? 'bg-error' : 'bg-base-300'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${question.required ? 'left-4.5' : 'left-0.5'}`} />
             </div>
-            <span className={`text-[11px] font-medium transition-colors ${question.required ? 'text-error' : 'text-base-content/35'}`}>
+            <span className={`text-xs font-semibold transition-colors ${question.required ? 'text-error' : 'text-base-content/40'}`}>
               Zorunlu
             </span>
           </div>

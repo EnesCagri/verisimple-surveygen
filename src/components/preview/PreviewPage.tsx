@@ -26,7 +26,7 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
     isCurrentQuestionRequired,
     isCurrentQuestionAnswered,
     isSurveyValid,
-    showRequiredSkipToast,
+    skipToast,
     goNext,
     goPrev,
     selectAnswer,
@@ -141,10 +141,29 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
 
   return (
     <div className="fixed inset-0 z-50 bg-base-100 flex flex-col">
-      {showRequiredSkipToast && (
-        <div className="fixed top-4 right-4 z-70 animate-[fadeSlideIn_0.2s_ease-out]">
-          <div className="px-4 py-2.5 rounded-xl bg-warning/15 border border-warning/35 text-warning text-sm font-medium shadow-lg">
-            Lütfen soruyu boş geçmeyin. Geçmek için tekrar tıklayın.
+      {skipToast && (
+        <div
+          className="fixed bottom-4 right-4 z-[70] max-w-[min(100vw-2rem,22rem)] animate-[fadeSlideIn_0.25s_ease-out]"
+          role="status"
+        >
+          <div
+            className={`rounded-2xl border px-4 py-3 text-sm font-medium leading-snug shadow-md ${
+              skipToast.kind === 'reminder'
+                ? 'border-amber-200/80 bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50 text-amber-950 dark:border-amber-200/70 dark:from-amber-50 dark:via-orange-50 dark:to-amber-100 dark:text-amber-950'
+                : 'border-rose-200/80 bg-gradient-to-br from-rose-50 via-red-50 to-pink-50 text-rose-900 dark:border-rose-200/70 dark:from-rose-50 dark:via-red-50 dark:to-pink-50 dark:text-rose-900'
+            }`}
+          >
+            {skipToast.kind === 'reminder' ? (
+              <>
+                Lütfen mümkünse bu soruyu yanıtlayın. Boş geçmek istiyorsanız <strong className="font-semibold">İleri</strong>&apos;ye bir kez daha
+                basın.
+              </>
+            ) : (
+              <>
+                Bu soruyu yanıtsız bıraktınız — anlıyoruz. Anket kalitesi için mümkünse diğer soruları eksiksiz yanıtlamanızı rica
+                ederiz.
+              </>
+            )}
           </div>
         </div>
       )}

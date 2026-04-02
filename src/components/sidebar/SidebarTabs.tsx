@@ -43,7 +43,7 @@ export function SidebarTabs({ activeTab, onTabChange }: SidebarTabsProps) {
         <Tooltip key={tab.id} content={tab.tooltip} position="bottom" delay={500} className="flex-1">
           <button
             className={`
-              w-full flex items-center justify-center gap-2 py-3 text-xs font-semibold uppercase tracking-wider
+              w-full flex items-center justify-center gap-2.5 py-3.5 text-sm font-semibold uppercase tracking-wide
               transition-all duration-200 border-b-2
               ${activeTab === tab.id
                 ? 'border-primary text-primary'

@@ -200,8 +200,8 @@ function ChoicePreview({
                 w-full text-left rounded-2xl border-2 transition-all duration-200 ease-out group
                 ${hasAnyImage ? 'p-3 flex flex-col' : 'px-5 py-4 flex items-center gap-4'}
                 ${isSelected
-                  ? 'border-primary bg-primary/4 shadow-sm'
-                  : 'border-base-300/50 bg-base-100 hover:border-primary/30 hover:shadow-sm'
+                  ? 'border-primary bg-primary/5 shadow-sm dark:border-primary dark:bg-primary/10'
+                  : 'border-base-300/50 bg-base-100 hover:border-base-300 hover:bg-base-200/35 dark:hover:bg-base-200/25 hover:shadow-sm'
                 }
               `}
               onClick={() => {
@@ -227,10 +227,7 @@ function ChoicePreview({
                   className={`
                     shrink-0 w-6 h-6 flex items-center justify-center transition-all duration-200
                     ${isMultiple ? 'rounded-md' : 'rounded-full'}
-                    ${isSelected
-                      ? 'bg-primary text-primary-content'
-                      : 'border-2 border-base-300/60 group-hover:border-primary/40'
-                    }
+                    ${isSelected ? 'bg-primary text-primary-content shadow-sm' : 'border-2 border-base-300/55 group-hover:border-base-400/70'}
                   `}
                 >
                   {isSelected && (
@@ -240,10 +237,12 @@ function ChoicePreview({
                   )}
                 </span>
                 <span className="flex items-center gap-3 flex-1">
-                  <span className={`
-                    inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold shrink-0 transition-colors duration-200
-                    ${isSelected ? 'bg-primary/15 text-primary' : 'bg-base-200/60 text-base-content/40'}
-                  `}>
+                  <span
+                    className={`
+                    inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold shrink-0 transition-colors duration-200 border
+                    ${isSelected ? 'bg-primary text-primary-content border-primary shadow-sm' : 'bg-base-200/80 text-base-content/45 border-base-300/60'}
+                  `}
+                  >
                     {String.fromCharCode(65 + index)}
                   </span>
                   <span className={`text-base transition-colors duration-200 ${isSelected ? 'text-base-content/90 font-medium' : 'text-base-content/60'}`}>
