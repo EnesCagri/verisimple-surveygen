@@ -205,9 +205,11 @@ function ChoicePreview({
                 }
               `}
               onClick={() => {
+                const wasSelected = isSelected;
                 onSelectAnswer(question.guid, answer, isMultiple);
-                if (!isMultiple && onSingleChoiceNext) {
-                  onSingleChoiceNext();
+                if (!isMultiple) {
+                  if (wasSelected) return;
+                  onSingleChoiceNext?.();
                 }
               }}
             >
@@ -398,7 +400,14 @@ function RatingPreview({
                 key={i}
                 className="group p-1 transition-transform duration-150 hover:scale-110 focus:outline-none"
                 onMouseEnter={() => setHovered(starValue)}
-                onClick={() => { onChange(starValue); setTimeout(() => onNext?.(), 300); }}
+                onClick={() => {
+                  if (value === starValue) {
+                    onChange(0);
+                    return;
+                  }
+                  onChange(starValue);
+                  setTimeout(() => onNext?.(), 300);
+                }}
               >
                 <svg
                   width="32"

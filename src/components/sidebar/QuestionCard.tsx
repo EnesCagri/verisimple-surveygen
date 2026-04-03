@@ -8,6 +8,8 @@ interface QuestionCardProps {
   question: Question;
   index: number;
   isSelected: boolean;
+  /** Koşullu çıkışı olan soru — sürüklenemez (liste sırası korunmalı) */
+  dragDisabled?: boolean;
   onSelect: (guid: string) => void;
   onDelete: (guid: string) => void;
   onUpdate?: (guid: string, updates: Partial<Omit<Question, 'guid'>>) => void;
@@ -105,6 +107,7 @@ export function QuestionCard({
   question,
   index,
   isSelected,
+  dragDisabled = false,
   onSelect,
   onDelete,
   onUpdate,
@@ -112,9 +115,11 @@ export function QuestionCard({
   const { ref, isDragging } = useSortable({
     id: question.guid,
     index,
+    disabled: dragDisabled,
   });
 
   const detail = getTypeDetail(question);
+  const isControl = question.settings?.isControlQuestion === true;
 
   return (
     <div
@@ -123,8 +128,10 @@ export function QuestionCard({
         group relative rounded-2xl bg-base-100 cursor-pointer
         transition-all duration-200 ease-out
         ${isSelected
-          ? 'shadow-md ring-2 ring-primary/50 bg-primary/3'
-          : 'shadow-sm hover:shadow-md border border-base-300/60 hover:border-primary/30'
+          ? `shadow-md ring-2 ring-primary/50 bg-primary/3 ${isControl ? 'border border-accent/35' : ''}`
+          : isControl
+            ? 'shadow-sm hover:shadow-md border-2 border-accent/40 bg-accent/6 hover:border-accent/55'
+            : 'shadow-sm hover:shadow-md border border-base-300/60 hover:border-primary/30'
         }
         ${isDragging ? 'opacity-40 scale-[0.97] rotate-1' : ''}
       `}
@@ -132,23 +139,37 @@ export function QuestionCard({
     >
       <div className="flex items-start gap-3 p-3.5">
         {/* Drag handle */}
-        <div className="pt-1.5 cursor-grab active:cursor-grabbing">
+        <div
+          className={`pt-1.5 ${dragDisabled ? 'cursor-not-allowed opacity-40' : 'cursor-grab active:cursor-grabbing'}`}
+          title={
+            dragDisabled
+              ? 'Bu sorudan koşullu bağlantı var; sürükleyerek sıra değiştirmek kapalı.'
+              : undefined
+          }
+        >
           <GripIcon />
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary text-sm font-bold shrink-0">
+          <div className="flex items-center gap-2 mb-1 min-w-0">
+            <span
+              className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-sm font-bold shrink-0 ${isControl ? 'bg-accent/15 text-accent' : 'bg-primary/10 text-primary'}`}
+            >
               {question.order}
             </span>
-            <span className="text-sm font-semibold truncate text-base-content/80">
+            {isControl && (
+              <span className="shrink-0 rounded-md border border-accent/35 bg-accent/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent">
+                Kontrol
+              </span>
+            )}
+            <span className="text-sm font-semibold truncate text-base-content/80 min-w-0">
               {question.text || 'Yeni Soru'}
             </span>
           </div>
 
           {/* Type badge with tooltip */}
-          <div className="pl-8">
+          <div className="pl-8 flex flex-wrap items-center gap-2">
             <Tooltip content={questionTypeDescriptions[question.type]} position="bottom" delay={400}>
               <span className="inline-flex items-center gap-1.5 text-xs text-base-content/45 bg-base-200/70 rounded-lg px-2.5 py-1 cursor-default">
                 <span className="text-base-content/30">{typeIcons[question.type]}</span>

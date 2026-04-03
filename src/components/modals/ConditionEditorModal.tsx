@@ -1,12 +1,23 @@
-import { useState } from 'react';
-import type { Question, ConditionAction, ConditionInput, ConditionOperator } from '../../types/survey';
+import { useEffect, useState } from 'react';
+import type {
+  Question,
+  ConditionAction,
+  ConditionInput,
+  ConditionOperator,
+  ConditionalRule,
+} from '../../types/survey';
 import { QuestionType } from '../../types/survey';
 import { operatorsForType, operatorNeedsValue } from '../../utils/condition';
+import { findConflictingCondition } from '../../utils/conditionDuplicate';
 
 interface ConditionEditorModalProps {
   open: boolean;
   sourceQuestion: Question;
   questions: Question[];
+  /** Tüm koşullar (aynı kaynakta çift kural engeli için) */
+  conditions: ConditionalRule[];
+  /** Düzenleme modunda mevcut kural id — kendisiyle çakışma sayılmaz */
+  excludeConditionId?: string;
   initialAnswer?: string;
   initialAction?: ConditionAction;
   initialOperator?: ConditionOperator;
@@ -19,6 +30,8 @@ export function ConditionEditorModal({
   open,
   sourceQuestion,
   questions,
+  conditions,
+  excludeConditionId,
   initialAnswer,
   initialAction,
   initialOperator,
@@ -46,6 +59,16 @@ export function ConditionEditorModal({
       ? initialAction.targetQuestionId
       : questions.filter((q) => q.guid !== sourceQuestion.guid)[0]?.guid ?? '',
   );
+
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) setDuplicateError(null);
+  }, [open, sourceQuestion.guid, excludeConditionId]);
+
+  useEffect(() => {
+    setDuplicateError(null);
+  }, [operator, answerValue, rowIndex]);
 
   if (!open) return null;
 
@@ -78,6 +101,19 @@ export function ConditionEditorModal({
       rowIndex: operator === 'row_equals' ? rowIndex : undefined,
     };
 
+    const conflict = findConflictingCondition(
+      conditions,
+      sourceQuestion.guid,
+      input,
+      excludeConditionId,
+    );
+    if (conflict) {
+      setDuplicateError(
+        'Bu soru için aynı koşul mantığı zaten kullanılıyor. Örneğin yalnızca bir "Herhangi bir cevap" kuralı eklenebilir; farklı hedefler için önce mevcut kuralı silin veya koşulu değiştirin.',
+      );
+      return;
+    }
+    setDuplicateError(null);
     onSave(input);
   };
 
@@ -232,6 +268,12 @@ export function ConditionEditorModal({
             </div>
           )}
         </div>
+
+        {duplicateError && (
+          <p className="px-6 pb-2 text-sm font-medium text-error" role="alert">
+            {duplicateError}
+          </p>
+        )}
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-base-300/40">

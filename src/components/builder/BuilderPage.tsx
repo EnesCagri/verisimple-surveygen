@@ -137,14 +137,15 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
     mutators,
   });
 
-  // Auto-save on changes (local store + bridge notification)
+  // Auto-save on changes (local store + bridge notification).
+  // nodePositions / sequentialEdges için `undefined` gönderme: updateSurvey birleşiminde kayıtlı değeri silmez.
   useEffect(() => {
     onSave(survey.id, {
       title,
       questions,
       conditions,
-      nodePositions,
-      sequentialEdges,
+      ...(nodePositions !== undefined ? { nodePositions } : {}),
+      ...(sequentialEdges !== undefined ? { sequentialEdges } : {}),
     });
     bridgeNotifyChange(getSurveyPayload(survey.id));
   }, [
@@ -192,6 +193,7 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
   const mainContent =
     activeTab === "flow" ? (
       <FlowCanvas
+        surveyId={survey.id}
         questions={questions}
         conditions={conditions}
         nodePositions={nodePositions}

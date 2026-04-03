@@ -1,6 +1,14 @@
-import { useCallback, useMemo, useEffect, useState, useRef } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+} from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   Controls,
   type Node,
@@ -8,24 +16,49 @@ import {
   type Connection,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   BackgroundVariant,
   MarkerType,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
-import type { Question, ConditionalRule, ConditionInput, NodePositions, SequentialEdges } from '../../types/survey';
-import { QuestionNode, type QuestionNodeData } from './QuestionNode';
-import { EndNode } from './EndNode';
-import { InvalidEndNode } from './InvalidEndNode';
-import { StartNode } from './StartNode';
-import { ConditionEditorModal } from '../modals/ConditionEditorModal';
-import { EdgeContextMenu } from './EdgeContextMenu';
-import { operatorLabel, conditionDescription } from '../../utils/condition';
-import type { ConditionSummary } from './QuestionNodeTooltip';
+import {
+  applyDagreLayout,
+  hasSavedNodePositions,
+  normalizeCustomSequentialEdges,
+} from "../../utils/flowDagreLayout";
 
-const START_NODE_ID = '__start__';
-const END_NODE_ID = '__end__';
-const INVALID_END_NODE_ID = '__invalid_end__';
+import type {
+  Question,
+  ConditionalRule,
+  ConditionInput,
+  NodePositions,
+  SequentialEdges,
+} from "../../types/survey";
+import { QuestionNode, type QuestionNodeData } from "./QuestionNode";
+import { EndNode } from "./EndNode";
+import { InvalidEndNode } from "./InvalidEndNode";
+import { StartNode } from "./StartNode";
+import { ConditionEditorModal } from "../modals/ConditionEditorModal";
+import { EdgeContextMenu } from "./EdgeContextMenu";
+import { operatorLabel, conditionDescription } from "../../utils/condition";
+import type { ConditionSummary } from "./QuestionNodeTooltip";
+
+const START_NODE_ID = "__start__";
+const END_NODE_ID = "__end__";
+const INVALID_END_NODE_ID = "__invalid_end__";
+
+function collectNodePositionsFromNodes(nodes: Node[]): NodePositions {
+  const positions: NodePositions = {};
+  for (const node of nodes) {
+    const p = { x: node.position.x, y: node.position.y };
+    if (node.id === END_NODE_ID) positions.__end__ = p;
+    else if (node.id === INVALID_END_NODE_ID) positions.__invalid_end__ = p;
+    else if (node.id === START_NODE_ID) positions.__start__ = p;
+    else positions[node.id] = p;
+  }
+  return positions;
+}
 
 const nodeTypes = {
   start: StartNode,
@@ -35,6 +68,8 @@ const nodeTypes = {
 };
 
 interface FlowCanvasProps {
+  /** Anket değişince otomatik fit/layout davranışı için (opsiyonel) */
+  surveyId?: string;
   questions: Question[];
   conditions: ConditionalRule[];
   /** Saved node positions (optional) */
@@ -67,22 +102,24 @@ function buildConditionSummaries(
 
       let actionLabel: string;
       let isEnd = false;
-      if (rule.action.type === 'end_survey') {
-        actionLabel = 'Bitir';
+      if (rule.action.type === "end_survey") {
+        actionLabel = "Bitir";
         isEnd = true;
       } else {
         // TypeScript knows this is 'jump_to' here
         const jumpAction = rule.action;
-        if (jumpAction.type === 'jump_to') {
-          if (jumpAction.targetQuestionId === '__invalid_end__') {
-            actionLabel = 'Geçersiz';
+        if (jumpAction.type === "jump_to") {
+          if (jumpAction.targetQuestionId === "__invalid_end__") {
+            actionLabel = "Geçersiz";
             isEnd = true;
             return { description: desc, actionLabel, isEnd };
           }
-          const target = questions.find((q) => q.guid === jumpAction.targetQuestionId);
-          actionLabel = target ? `S${target.order}` : '?';
+          const target = questions.find(
+            (q) => q.guid === jumpAction.targetQuestionId,
+          );
+          actionLabel = target ? `S${target.order}` : "?";
         } else {
-          actionLabel = '?';
+          actionLabel = "?";
         }
       }
 
@@ -107,7 +144,7 @@ function buildNodes(
   const defaultStartPos = { x: xCenter + 60, y: 30 };
   allNodes.push({
     id: START_NODE_ID,
-    type: 'start',
+    type: "start",
     position: savedStartPos ?? defaultStartPos,
     data: {},
   });
@@ -120,11 +157,15 @@ function buildNodes(
       y: yStartOffset + i * yGap,
     };
 
-    const condSummaries = buildConditionSummaries(q.guid, conditions, questions);
+    const condSummaries = buildConditionSummaries(
+      q.guid,
+      conditions,
+      questions,
+    );
 
     allNodes.push({
       id: q.guid,
-      type: 'question',
+      type: "question",
       position: savedPos ?? defaultPos,
       data: {
         order: q.order,
@@ -147,7 +188,7 @@ function buildNodes(
   };
   allNodes.push({
     id: END_NODE_ID,
-    type: 'end',
+    type: "end",
     position: savedEndPos ?? defaultEndPos,
     data: {},
   });
@@ -160,7 +201,7 @@ function buildNodes(
   };
   allNodes.push({
     id: INVALID_END_NODE_ID,
-    type: 'invalidEnd',
+    type: "invalidEnd",
     position: savedInvalidEndPos ?? defaultInvalidEndPos,
     data: {},
   });
@@ -170,45 +211,59 @@ function buildNodes(
 
 function buildEdgeLabel(rule: ConditionalRule, questions: Question[]): string {
   const src = questions.find((q) => q.guid === rule.sourceQuestionId);
-  const op = rule.operator ?? (rule.answer === '*' ? 'any' : 'equals');
+  const op = rule.operator ?? (rule.answer === "*" ? "any" : "equals");
 
-  if (op === 'any') return 'Herhangi';
-  if (op === 'equals') return rule.answer;
-  if (op === 'row_equals' && src?.settings?.rows && rule.rowIndex !== undefined) {
-    const rowLabel = src.settings.rows[rule.rowIndex] ?? `Satır ${rule.rowIndex + 1}`;
+  if (op === "any") return "Herhangi";
+  if (op === "equals") return rule.answer;
+  if (
+    op === "row_equals" &&
+    src?.settings?.rows &&
+    rule.rowIndex !== undefined
+  ) {
+    const rowLabel =
+      src.settings.rows[rule.rowIndex] ?? `Satır ${rule.rowIndex + 1}`;
     return `${rowLabel} → ${rule.answer}`;
   }
   // Rating / TextEntry: show "operator value"
   return `${operatorLabel(op)} ${rule.answer}`;
 }
 
-function buildEdges(questions: Question[], conditions: ConditionalRule[], sequentialEdges?: SequentialEdges): Edge[] {
+function buildEdges(
+  questions: Question[],
+  conditions: ConditionalRule[],
+  sequentialEdges?: SequentialEdges,
+): Edge[] {
   const edges: Edge[] = [];
   const blockedSet = new Set(sequentialEdges?.blockedEdges ?? []);
-  const customEdgesList = sequentialEdges?.customEdges ?? [];
+  const customEdgesList = normalizeCustomSequentialEdges(sequentialEdges?.customEdges);
 
   // Track which sources already have an outgoing sequential edge → prevent duplicates
   const seqSourceUsed = new Set<string>();
 
   // Helper to add a sequential edge (skips if source already has one)
-  const addSeqEdge = (id: string, source: string, target: string, isStart = false) => {
+  const addSeqEdge = (
+    id: string,
+    source: string,
+    target: string,
+    isStart = false,
+  ) => {
     if (seqSourceUsed.has(source)) return; // ← only ONE outgoing sequential per source
     if (blockedSet.has(id)) return;
 
-    const startColor = 'oklch(65% 0.18 155)';
-    const seqColor = 'oklch(80% 0.02 280)';
+    const startColor = "oklch(65% 0.18 155)";
+    const seqColor = "oklch(80% 0.02 280)";
     const color = isStart ? startColor : seqColor;
 
     edges.push({
       id,
       source,
       target,
-      type: 'smoothstep',
+      type: "smoothstep",
       animated: false,
       style: {
         stroke: color,
         strokeWidth: isStart ? 3 : 2.4,
-        strokeDasharray: isStart ? undefined : '6 4',
+        strokeDasharray: isStart ? undefined : "6 4",
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
@@ -222,15 +277,16 @@ function buildEdges(questions: Question[], conditions: ConditionalRule[], sequen
 
   // 1. Custom edges first (they have priority over defaults)
   customEdgesList.forEach((custom) => {
-    const realSource = custom.source === '__start__' ? START_NODE_ID : custom.source;
+    const realSource =
+      custom.source === "__start__" ? START_NODE_ID : custom.source;
     const realTarget =
-      custom.target === '__end__'
+      custom.target === "__end__"
         ? END_NODE_ID
-        : custom.target === '__invalid_end__'
+        : custom.target === "__invalid_end__"
           ? INVALID_END_NODE_ID
           : custom.target;
     const edgeId = `seq-${custom.source}-${custom.target}`;
-    addSeqEdge(edgeId, realSource, realTarget, custom.source === '__start__');
+    addSeqEdge(edgeId, realSource, realTarget, custom.source === "__start__");
   });
 
   // 2. Start → first question (default, only if not already set by custom edge)
@@ -254,28 +310,31 @@ function buildEdges(questions: Question[], conditions: ConditionalRule[], sequen
   // 5. Conditional edges (these are separate and always shown)
   (conditions ?? []).forEach((rule) => {
     const target =
-      rule.action.type === 'end_survey'
+      rule.action.type === "end_survey"
         ? END_NODE_ID
         : rule.action.targetQuestionId;
-    const isInvalidEnd = target === '__invalid_end__';
-    const isEnd = rule.action.type === 'end_survey' || isInvalidEnd;
+    const isInvalidEnd = target === "__invalid_end__";
+    const isEnd = rule.action.type === "end_survey" || isInvalidEnd;
     const color = isInvalidEnd
-      ? 'oklch(83% 0.16 85)'
+      ? "oklch(83% 0.16 85)"
       : isEnd
-        ? 'oklch(65% 0.2 25)'
-        : 'oklch(65% 0.19 281)';
-    const label = isInvalidEnd ? 'Geçersiz Bitir' : buildEdgeLabel(rule, questions);
-    const realTarget = target === '__invalid_end__' ? INVALID_END_NODE_ID : target;
+        ? "oklch(65% 0.2 25)"
+        : "oklch(65% 0.19 281)";
+    const label = isInvalidEnd
+      ? "Geçersiz Bitir"
+      : buildEdgeLabel(rule, questions);
+    const realTarget =
+      target === "__invalid_end__" ? INVALID_END_NODE_ID : target;
 
     edges.push({
       id: `cond-${rule.id}`,
       source: rule.sourceQuestionId,
       target: realTarget,
-      type: 'smoothstep',
+      type: "smoothstep",
       animated: true,
       label,
       labelStyle: { fontSize: 13, fontWeight: 700, fill: color },
-      labelBgStyle: { fill: 'white', fillOpacity: 0.9 },
+      labelBgStyle: { fill: "white", fillOpacity: 0.9 },
       labelBgPadding: [8, 5] as [number, number],
       labelBgBorderRadius: 8,
       style: { stroke: color, strokeWidth: 2.8 },
@@ -289,6 +348,25 @@ function buildEdges(questions: Question[], conditions: ConditionalRule[], sequen
   });
 
   return edges;
+}
+
+/** Kayıtlı pozisyon yoksa Dagre ile hizalı düğümler; varsa mevcut kaydı kullanır. */
+function computeNodesForCanvas(
+  questions: Question[],
+  conditions: ConditionalRule[],
+  nodePositions: NodePositions | undefined,
+  sequentialEdges: SequentialEdges | undefined,
+  onDeleteQuestion?: (guid: string) => void,
+): Node[] {
+  const built = buildNodes(
+    questions,
+    conditions,
+    nodePositions,
+    onDeleteQuestion,
+  );
+  if (hasSavedNodePositions(nodePositions)) return built;
+  const ed = buildEdges(questions, conditions, sequentialEdges);
+  return applyDagreLayout(built, ed);
 }
 
 // --- State types ---
@@ -307,7 +385,7 @@ interface ConnectionTypeMenu {
 }
 
 interface ContextMenuState {
-  type: 'condition' | 'sequential';
+  type: "condition" | "sequential";
   id: string; // conditionId for conditions, edgeId for sequential edges
   x: number;
   y: number;
@@ -315,7 +393,8 @@ interface ContextMenuState {
 
 // --- Component ---
 
-export function FlowCanvas({
+function FlowCanvasInner({
+  surveyId,
   questions,
   conditions,
   nodePositions,
@@ -329,6 +408,12 @@ export function FlowCanvas({
   onSequentialEdgesChange,
 }: FlowCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const { fitView } = useReactFlow();
+  const lastAutoFitKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    lastAutoFitKeyRef.current = null;
+  }, [surveyId]);
 
   // Sort questions by order to ensure flow diagram matches sidebar order
   const sortedQuestions = useMemo(() => {
@@ -336,12 +421,49 @@ export function FlowCanvas({
   }, [questions]);
 
   const initialNodes = useMemo(
-    () => buildNodes(sortedQuestions, conditions, nodePositions, onDeleteQuestion),
-    [sortedQuestions, conditions, nodePositions, onDeleteQuestion],
+    () =>
+      computeNodesForCanvas(
+        sortedQuestions,
+        conditions,
+        nodePositions,
+        sequentialEdges,
+        onDeleteQuestion,
+      ),
+    [
+      sortedQuestions,
+      conditions,
+      nodePositions,
+      sequentialEdges,
+      onDeleteQuestion,
+    ],
   );
   const initialEdges = useMemo(
     () => buildEdges(sortedQuestions, conditions, sequentialEdges),
     [sortedQuestions, conditions, sequentialEdges],
+  );
+
+  /** Kaynak başına tek görünen sıralı kenar (koşullar hariç) — çift bağlantıyı engellemek için */
+  const activeSequentialTargets = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of initialEdges) {
+      if (!e.id.startsWith("seq-")) continue;
+      if (!m.has(e.source)) m.set(e.source, e.target);
+    }
+    return m;
+  }, [initialEdges]);
+
+  const isValidConnection = useCallback(
+    (c: Connection | Edge) => {
+      if (!c.source || !c.target) return false;
+      if (c.source === END_NODE_ID) return false;
+      if (c.source === INVALID_END_NODE_ID) return false;
+      if (c.target === START_NODE_ID) return false;
+      if (c.source === c.target) return false;
+      const existing = activeSequentialTargets.get(c.source);
+      if (existing !== undefined && existing === c.target) return false;
+      return true;
+    },
+    [activeSequentialTargets],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -350,11 +472,20 @@ export function FlowCanvas({
   // Track if any node is currently being dragged
   const [isDragging, setIsDragging] = useState(false);
 
-  const [pendingConn, setPendingConn] = useState<PendingConnection | null>(null);
-  const [editingCondition, setEditingCondition] = useState<ConditionalRule | null>(null);
+  const [pendingConn, setPendingConn] = useState<PendingConnection | null>(
+    null,
+  );
+  const [editingCondition, setEditingCondition] =
+    useState<ConditionalRule | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [connTypeMenu, setConnTypeMenu] = useState<ConnectionTypeMenu | null>(null);
-  const [nodeMenu, setNodeMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [connTypeMenu, setConnTypeMenu] = useState<ConnectionTypeMenu | null>(
+    null,
+  );
+  const [nodeMenu, setNodeMenu] = useState<{
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   // Track node positions and notify parent when they change (only when not dragging)
   useEffect(() => {
@@ -376,10 +507,13 @@ export function FlowCanvas({
     // Only update if positions actually changed (avoid infinite loops)
     const hasChanges = Object.keys(positions).some((id) => {
       const saved =
-        id === '__end__' ? nodePositions?.__end__ :
-        id === '__invalid_end__' ? nodePositions?.__invalid_end__ :
-        id === '__start__' ? nodePositions?.__start__ :
-        nodePositions?.[id];
+        id === "__end__"
+          ? nodePositions?.__end__
+          : id === "__invalid_end__"
+            ? nodePositions?.__invalid_end__
+            : id === "__start__"
+              ? nodePositions?.__start__
+              : nodePositions?.[id];
       const current = positions[id];
       if (!saved || !current) return true;
       return saved.x !== current.x || saved.y !== current.y;
@@ -396,46 +530,117 @@ export function FlowCanvas({
     setIsDragging(isAnyDragging);
   }, [nodes]);
 
-  // Only rebuild nodes when questions change (not when positions change during drag)
+  const handleAutoLayout = useCallback(() => {
+    setNodes((prev) => {
+      const next = applyDagreLayout(prev, edges);
+      onNodePositionsChange?.(collectNodePositionsFromNodes(next));
+      return next;
+    });
+    requestAnimationFrame(() => {
+      fitView({ padding: 0.32, maxZoom: 1, duration: 320 });
+    });
+  }, [edges, setNodes, fitView, onNodePositionsChange]);
+
+  const sequentialKey = useMemo(
+    () => JSON.stringify(sequentialEdges ?? {}),
+    [sequentialEdges],
+  );
+
+  // Kayıtlı yerleşim yokken Dagre sonrası görünümü kadraja al (anket/küme değişince tekrar)
+  useLayoutEffect(() => {
+    if (hasSavedNodePositions(nodePositions)) return;
+    if (nodes.length === 0) return;
+    const key = `${surveyId ?? ""}:${sortedQuestions.length}:${conditions.length}:${sequentialKey}`;
+    if (lastAutoFitKeyRef.current === key) return;
+    lastAutoFitKeyRef.current = key;
+    const id = requestAnimationFrame(() => {
+      fitView({ padding: 0.32, maxZoom: 1, duration: 240 });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [
+    surveyId,
+    sortedQuestions.length,
+    conditions.length,
+    sequentialKey,
+    nodePositions,
+    nodes.length,
+    fitView,
+  ]);
+
+  // Soru / koşul / sıra kenarı değişince düğümleri güncelle (kayıtsız yerleşimde her zaman Dagre)
   useEffect(() => {
-    // Don't update nodes while dragging - this causes edge flickering
     if (isDragging) return;
 
+    if (!hasSavedNodePositions(nodePositions)) {
+      const layouted = computeNodesForCanvas(
+        sortedQuestions,
+        conditions,
+        nodePositions,
+        sequentialEdges,
+        onDeleteQuestion,
+      );
+      onNodePositionsChange?.(collectNodePositionsFromNodes(layouted));
+      setNodes((prev) =>
+        layouted.map((n) => {
+          const p = prev.find((x) => x.id === n.id);
+          if (p?.dragging) {
+            return {
+              ...n,
+              position: p.position,
+              dragging: true,
+              selected: p.selected,
+            };
+          }
+          return n;
+        }),
+      );
+      return;
+    }
+
     setNodes((prev) => {
-      const built = buildNodes(sortedQuestions, conditions, nodePositions, onDeleteQuestion);
+      const built = computeNodesForCanvas(
+        sortedQuestions,
+        conditions,
+        nodePositions,
+        sequentialEdges,
+        onDeleteQuestion,
+      );
       const existingIds = new Set(prev.map((n) => n.id));
       const builtIds = new Set(built.map((n) => n.id));
 
-      // Check if questions actually changed (new nodes added/removed)
       const questionsChanged =
         built.length !== prev.length ||
         built.some((n) => !existingIds.has(n.id)) ||
         prev.some((n) => !builtIds.has(n.id));
 
       if (!questionsChanged) {
-        // Questions didn't change, just update data for existing nodes
         return prev.map((existing) => {
           const builtNode = built.find((n) => n.id === existing.id);
           if (builtNode) {
-            // Update data but preserve position and dragging state
             return { ...existing, data: builtNode.data };
           }
           return existing;
         });
       }
 
-      // Questions changed - merge existing positions with new nodes
       return built.map((n) => {
         const existing = prev.find((p) => p.id === n.id);
         if (existing) {
-          // Preserve existing position and dragging state
           return { ...existing, data: n.data };
         }
-        // New node - use built position
         return n;
       });
     });
-  }, [sortedQuestions, conditions, isDragging, setNodes, nodePositions, onDeleteQuestion]);
+  }, [
+    sortedQuestions,
+    conditions,
+    sequentialEdges,
+    isDragging,
+    setNodes,
+    nodePositions,
+    onDeleteQuestion,
+    onNodePositionsChange,
+  ]);
 
   useEffect(() => {
     setEdges(buildEdges(sortedQuestions, conditions, sequentialEdges));
@@ -459,16 +664,24 @@ export function FlowCanvas({
         const blocked = new Set(current.blockedEdges ?? []);
 
         // Remove any existing custom edge from start
-        const customEdges = (current.customEdges ?? []).filter((e) => e.source !== '__start__');
+        const customEdges = (current.customEdges ?? []).filter(
+          (e) => e.source !== "__start__",
+        );
 
         // Block the old default start edge if it points to a different target
-        if (sortedQuestions.length > 0 && sortedQuestions[0].guid !== connection.target) {
+        if (
+          sortedQuestions.length > 0 &&
+          sortedQuestions[0].guid !== connection.target
+        ) {
           blocked.add(`seq-__start__-${sortedQuestions[0].guid}`);
         }
 
         onSequentialEdgesChange({
           blockedEdges: blocked.size > 0 ? Array.from(blocked) : undefined,
-          customEdges: [...customEdges, { source: '__start__', target: connection.target }],
+          customEdges: [
+            ...customEdges,
+            { source: "__start__", target: connection.target },
+          ],
         });
         return;
       }
@@ -508,7 +721,9 @@ export function FlowCanvas({
     const blocked = new Set(current.blockedEdges ?? []);
 
     // Remove any existing custom edge from the same source (replace it)
-    const customEdges = (current.customEdges ?? []).filter((e) => e.source !== sourceId);
+    const customEdges = (current.customEdges ?? []).filter(
+      (e) => e.source !== sourceId,
+    );
 
     // Block ALL default sequential edges from this source (prevent duplicates)
     const sourceIdx = sortedQuestions.findIndex((q) => q.guid === sourceId);
@@ -521,7 +736,10 @@ export function FlowCanvas({
         }
       }
       // Block default edge to end (if this is the last question)
-      if (sourceIdx === sortedQuestions.length - 1 && targetId !== END_NODE_ID) {
+      if (
+        sourceIdx === sortedQuestions.length - 1 &&
+        targetId !== END_NODE_ID
+      ) {
         blocked.add(`seq-${sourceId}-end`);
       }
     }
@@ -544,57 +762,66 @@ export function FlowCanvas({
     setConnTypeMenu(null);
   }, [connTypeMenu]);
 
-  const onEdgeClick = useCallback(
-    (event: React.MouseEvent, edge: Edge) => {
-      const wrapperRect = wrapperRef.current?.getBoundingClientRect();
-      if (!wrapperRect) return;
+  const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+    if (!wrapperRect) return;
 
-      if (edge.id.startsWith('cond-')) {
-        // Conditional edge
-        const condId = edge.id.replace('cond-', '');
-        setContextMenu({
-          type: 'condition',
-          id: condId,
-          x: event.clientX - wrapperRect.left,
-          y: event.clientY - wrapperRect.top,
-        });
-      } else if (edge.id.startsWith('seq-')) {
-        // Sequential edge
-        setContextMenu({
-          type: 'sequential',
-          id: edge.id,
-          x: event.clientX - wrapperRect.left,
-          y: event.clientY - wrapperRect.top,
-        });
-      }
-    },
-    [],
-  );
+    if (edge.id.startsWith("cond-")) {
+      // Conditional edge
+      const condId = edge.id.replace("cond-", "");
+      setContextMenu({
+        type: "condition",
+        id: condId,
+        x: event.clientX - wrapperRect.left,
+        y: event.clientY - wrapperRect.top,
+      });
+    } else if (edge.id.startsWith("seq-")) {
+      // Sequential edge
+      setContextMenu({
+        type: "sequential",
+        id: edge.id,
+        x: event.clientX - wrapperRect.left,
+        y: event.clientY - wrapperRect.top,
+      });
+    }
+  }, []);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       setContextMenu(null);
       setNodeMenu(null);
-      if (node.id !== END_NODE_ID && node.id !== START_NODE_ID && node.id !== INVALID_END_NODE_ID) {
+      if (
+        node.id !== END_NODE_ID &&
+        node.id !== START_NODE_ID &&
+        node.id !== INVALID_END_NODE_ID
+      ) {
         onSelectQuestion(node.id);
       }
     },
     [onSelectQuestion],
   );
 
-  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
-    event.preventDefault();
-    if (node.id === START_NODE_ID || node.id === END_NODE_ID || node.id === INVALID_END_NODE_ID) return;
-    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
-    if (!wrapperRect) return;
-    setContextMenu(null);
-    setConnTypeMenu(null);
-    setNodeMenu({
-      id: node.id,
-      x: event.clientX - wrapperRect.left,
-      y: event.clientY - wrapperRect.top,
-    });
-  }, []);
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.preventDefault();
+      if (
+        node.id === START_NODE_ID ||
+        node.id === END_NODE_ID ||
+        node.id === INVALID_END_NODE_ID
+      )
+        return;
+      const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+      if (!wrapperRect) return;
+      setContextMenu(null);
+      setConnTypeMenu(null);
+      setNodeMenu({
+        id: node.id,
+        x: event.clientX - wrapperRect.left,
+        y: event.clientY - wrapperRect.top,
+      });
+    },
+    [],
+  );
 
   const onPaneClick = useCallback(() => {
     setContextMenu(null);
@@ -605,7 +832,7 @@ export function FlowCanvas({
   // --- Context menu handlers ---
 
   const handleContextEdit = () => {
-    if (!contextMenu || contextMenu.type !== 'condition') return;
+    if (!contextMenu || contextMenu.type !== "condition") return;
     const cond = conditions.find((c) => c.id === contextMenu.id);
     if (cond) {
       setEditingCondition(cond);
@@ -615,10 +842,10 @@ export function FlowCanvas({
 
   const handleContextDelete = () => {
     if (!contextMenu) return;
-    
-    if (contextMenu.type === 'condition') {
+
+    if (contextMenu.type === "condition") {
       onRemoveCondition(contextMenu.id);
-    } else if (contextMenu.type === 'sequential' && onSequentialEdgesChange) {
+    } else if (contextMenu.type === "sequential" && onSequentialEdgesChange) {
       // Block this sequential edge
       const edgeId = contextMenu.id;
       const current = sequentialEdges ?? {};
@@ -626,10 +853,10 @@ export function FlowCanvas({
       blocked.add(edgeId);
 
       // Parse source/target from edge id: seq-{source}-{target}
-      const raw = edgeId.startsWith('seq-') ? edgeId.slice(4) : edgeId;
-      const splitAt = raw.lastIndexOf('-');
+      const raw = edgeId.startsWith("seq-") ? edgeId.slice(4) : edgeId;
+      const splitAt = raw.lastIndexOf("-");
       const sourceId = splitAt >= 0 ? raw.slice(0, splitAt) : raw;
-      const targetId = splitAt >= 0 ? raw.slice(splitAt + 1) : '';
+      const targetId = splitAt >= 0 ? raw.slice(splitAt + 1) : "";
 
       // Remove custom sequential edge(s) from same source to keep it disconnected
       const customEdges = (current.customEdges ?? []).filter(
@@ -664,18 +891,18 @@ export function FlowCanvas({
         customEdges,
       });
     }
-    
+
     setContextMenu(null);
   };
 
   // --- Modal handlers ---
 
-  const sourceQuestion =
-    pendingConn
-      ? questions.find((q) => q.guid === pendingConn.sourceQuestionId) ?? null
-      : editingCondition
-        ? questions.find((q) => q.guid === editingCondition.sourceQuestionId) ?? null
-        : null;
+  const sourceQuestion = pendingConn
+    ? (questions.find((q) => q.guid === pendingConn.sourceQuestionId) ?? null)
+    : editingCondition
+      ? (questions.find((q) => q.guid === editingCondition.sourceQuestionId) ??
+        null)
+      : null;
 
   const handleModalSave = (input: ConditionInput) => {
     if (editingCondition) {
@@ -685,7 +912,7 @@ export function FlowCanvas({
       // Override action if target is END node
       const finalInput: ConditionInput =
         pendingConn.targetNodeId === END_NODE_ID
-          ? { ...input, action: { type: 'end_survey' } }
+          ? { ...input, action: { type: "end_survey" } }
           : input;
       onAddCondition(pendingConn.sourceQuestionId, finalInput);
       setPendingConn(null);
@@ -701,8 +928,11 @@ export function FlowCanvas({
     ? editingCondition.action
     : pendingConn
       ? pendingConn.targetNodeId === END_NODE_ID
-        ? { type: 'end_survey' as const }
-        : { type: 'jump_to' as const, targetQuestionId: pendingConn.targetNodeId }
+        ? { type: "end_survey" as const }
+        : {
+            type: "jump_to" as const,
+            targetQuestionId: pendingConn.targetNodeId,
+          }
       : undefined;
 
   const modalInitialAnswer = editingCondition?.answer;
@@ -711,23 +941,48 @@ export function FlowCanvas({
 
   return (
     <div className="w-full h-full relative" ref={wrapperRef}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onEdgeClick={onEdgeClick}
-          onNodeClick={onNodeClick}
-          onNodeContextMenu={onNodeContextMenu}
-          onPaneClick={onPaneClick}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
-          proOptions={{ hideAttribution: true }}
-          defaultEdgeOptions={{ type: 'smoothstep' }}
-          className="bg-base-200"
+      <button
+        type="button"
+        onClick={handleAutoLayout}
+        className="absolute top-3 right-3 z-20 flex items-center gap-2 rounded-xl border border-base-300/60 bg-base-100/95 px-3.5 py-2 text-sm font-semibold text-base-content/80 shadow-md backdrop-blur-sm hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-colors"
+        title="Düğümleri Dagre ile yeniden hizala (sıra + koşullu kenarlar)"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
         >
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <path d="M14 14h7M14 17h4M14 20h7" />
+        </svg>
+        Otomatik yerleşim
+      </button>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        isValidConnection={isValidConnection}
+        onEdgeClick={onEdgeClick}
+        onNodeClick={onNodeClick}
+        onNodeContextMenu={onNodeContextMenu}
+        onPaneClick={onPaneClick}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
+        proOptions={{ hideAttribution: true }}
+        defaultEdgeOptions={{ type: "smoothstep" }}
+        className="bg-base-200"
+      >
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
@@ -753,21 +1008,47 @@ export function FlowCanvas({
             className="flex items-center gap-3 w-full text-left px-3.5 py-2.5 rounded-lg hover:bg-base-200 transition-colors text-base"
             onClick={handleCreateSequential}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(65% 0.19 281)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="oklch(65% 0.19 281)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 12h14" />
+              <path d="m12 5 7 7-7 7" />
             </svg>
             <span className="font-medium">Sıralı Bağlantı</span>
-            <span className="text-sm text-base-content/40 ml-auto">Doğrudan geçiş</span>
+            <span className="text-sm text-base-content/40 ml-auto">
+              Doğrudan geçiş
+            </span>
           </button>
           <button
             className="flex items-center gap-3 w-full text-left px-3.5 py-2.5 rounded-lg hover:bg-base-200 transition-colors text-base"
             onClick={handleCreateCondition}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(65% 0.2 25)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" /><path d="m15 9 6-6" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="oklch(65% 0.2 25)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M16 3h5v5" />
+              <path d="M8 3H3v5" />
+              <path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" />
+              <path d="m15 9 6-6" />
             </svg>
             <span className="font-medium">Koşullu Bağlantı</span>
-            <span className="text-sm text-base-content/40 ml-auto">Kurala göre</span>
+            <span className="text-sm text-base-content/40 ml-auto">
+              Kurala göre
+            </span>
           </button>
           <div className="border-t border-base-300/30 mt-1 pt-1">
             <button
@@ -785,7 +1066,9 @@ export function FlowCanvas({
           x={contextMenu.x}
           y={contextMenu.y}
           type={contextMenu.type}
-          onEdit={contextMenu.type === 'condition' ? handleContextEdit : undefined}
+          onEdit={
+            contextMenu.type === "condition" ? handleContextEdit : undefined
+          }
           onDelete={handleContextDelete}
           onClose={() => setContextMenu(null)}
         />
@@ -793,7 +1076,10 @@ export function FlowCanvas({
 
       {nodeMenu && (
         <>
-          <div className="fixed inset-0 z-55" onClick={() => setNodeMenu(null)} />
+          <div
+            className="fixed inset-0 z-55"
+            onClick={() => setNodeMenu(null)}
+          />
           <div
             className="absolute z-56 bg-base-100 rounded-xl shadow-xl border border-base-300/40 py-2 min-w-[180px] animate-fade-slide-in"
             style={{ left: nodeMenu.x, top: nodeMenu.y }}
@@ -805,7 +1091,16 @@ export function FlowCanvas({
                 setNodeMenu(null);
               }}
             >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M3 6h18" />
                 <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
                 <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
@@ -821,6 +1116,8 @@ export function FlowCanvas({
           open
           sourceQuestion={sourceQuestion}
           questions={questions}
+          conditions={conditions}
+          excludeConditionId={editingCondition?.id}
           initialAnswer={modalInitialAnswer}
           initialAction={modalInitialAction}
           initialOperator={modalInitialOperator}
@@ -830,5 +1127,13 @@ export function FlowCanvas({
         />
       )}
     </div>
+  );
+}
+
+export function FlowCanvas(props: FlowCanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <FlowCanvasInner {...props} />
+    </ReactFlowProvider>
   );
 }

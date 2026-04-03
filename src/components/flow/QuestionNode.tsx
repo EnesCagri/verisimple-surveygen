@@ -89,9 +89,19 @@ const typeConfig: Record<QuestionType, { label: string; icon: React.JSX.Element 
   },
 };
 
+function ControlBadgeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-90">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
 function QuestionNodeComponent({ data, selected }: NodeProps) {
   const d = data as unknown as QuestionNodeData;
   const { order, text, type, answers, settings, conditions = [], guid, onDelete } = d;
+  const isControl = settings?.isControlQuestion === true;
 
   const config = typeConfig[type] ?? { label: 'Bilinmeyen', icon: null };
 
@@ -160,9 +170,13 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
     >
       <div
         className={`
-          group bg-base-100 rounded-2xl border-2 shadow-lg min-w-[300px] max-w-[360px]
-          transition-all duration-200
-          ${selected ? 'border-primary shadow-primary/20' : 'border-base-300/50 hover:border-primary/40'}
+          group rounded-2xl border-2 shadow-lg min-w-[300px] max-w-[360px]
+          transition-all duration-200 bg-base-100
+          ${selected
+            ? `border-primary shadow-primary/20 ${isControl ? 'ring-2 ring-accent/35 ring-offset-2 ring-offset-base-100' : ''}`
+            : isControl
+              ? 'border-accent/55 bg-accent/7 hover:border-accent/75'
+              : 'border-base-300/50 hover:border-primary/40'}
         `}
       >
         {onDelete && (
@@ -188,20 +202,34 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
           position={Position.Top}
           className="w-12! h-8! bg-transparent! border-0! -top-4! cursor-crosshair"
         />
-        <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-1.5 z-10 w-3.5 h-3.5 rounded-full bg-primary border-2 border-base-100 transition-transform duration-150 group-hover:scale-110" />
+        <div
+          className={`pointer-events-none absolute left-1/2 -translate-x-1/2 -top-1.5 z-10 w-3.5 h-3.5 rounded-full border-2 border-base-100 transition-transform duration-150 group-hover:scale-110 ${isControl ? 'bg-accent' : 'bg-primary'}`}
+        />
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 pt-4 pb-3">
-          <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary text-base font-bold">
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base font-bold ${isControl ? 'bg-accent/15 text-accent' : 'bg-primary/10 text-primary'}`}
+          >
             {order}
           </span>
-          <div className="flex items-center gap-1.5 text-sm text-base-content/45 font-medium">
-            {config.icon}
-            {config.label}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-base-content/45">
+              {config.icon}
+              {config.label}
+            </div>
+            {isControl && (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-accent/45 bg-accent/12 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-accent shadow-sm"
+                title="Kontrol sorusu — doğru cevap tanımlı"
+              >
+                <ControlBadgeIcon />
+                Kontrol
+              </span>
+            )}
           </div>
-          {/* Condition indicator */}
           {conditions.length > 0 && (
-            <span className="ml-auto flex items-center justify-center w-7 h-7 rounded-full bg-warning/15 text-sm font-bold text-warning">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning/15 text-sm font-bold text-warning">
               {conditions.length}
             </span>
           )}
@@ -219,7 +247,9 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
           position={Position.Bottom}
           className="w-12! h-8! bg-transparent! border-0! -bottom-4! cursor-crosshair"
         />
-        <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-1.5 z-10 w-3.5 h-3.5 rounded-full bg-primary border-2 border-base-100 transition-transform duration-150 group-hover:scale-110" />
+        <div
+          className={`pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-1.5 z-10 w-3.5 h-3.5 rounded-full border-2 border-base-100 transition-transform duration-150 group-hover:scale-110 ${isControl ? 'bg-accent' : 'bg-primary'}`}
+        />
       </div>
 
       {/* Rich tooltip on hover (portal to avoid ReactFlow stacking contexts) */}

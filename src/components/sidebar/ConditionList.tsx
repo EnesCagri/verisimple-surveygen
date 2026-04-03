@@ -226,6 +226,8 @@ export function ConditionList({
           open
           sourceQuestion={editingSource}
           questions={questions}
+          conditions={conditions}
+          excludeConditionId={editingCondition.id}
           initialAnswer={editingCondition.answer}
           initialAction={editingCondition.action}
           initialOperator={editingCondition.operator}

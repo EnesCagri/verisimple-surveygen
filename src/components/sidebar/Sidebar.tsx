@@ -61,7 +61,7 @@ export function Sidebar({
             <QuestionList
               questions={questions}
               selectedId={selectedId}
-              hasConditions={conditions.length > 0}
+              conditions={conditions}
               onSelect={onSelect}
               onDelete={onDelete}
               onReorder={onReorder}

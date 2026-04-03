@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type { Question, ConditionalRule, SequentialEdges } from '../types/survey';
 import { evaluateCondition } from '../utils/condition';
 
@@ -35,11 +36,17 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
   const [skipArmedGuid, setSkipArmedGuid] = useState<string | null>(null);
   const [skipToast, setSkipToast] = useState<null | { kind: 'reminder' | 'ack' }>(null);
   const skipToastTimerRef = useRef<number | null>(null);
+  /** flushSync sonrası aynı tıklamada çağrılan goNext eski closure’da kalmasın (tek seçimde yanlış “atla” uyarısı). */
+  const goNextRef = useRef<() => void>(() => {});
+
+  const disarmSkipForQuestion = useCallback((guid: string) => {
+    setSkipArmedGuid((armed) => (armed === guid ? null : armed));
+  }, []);
 
   const showSkipToast = useCallback((kind: 'reminder' | 'ack') => {
     if (skipToastTimerRef.current) window.clearTimeout(skipToastTimerRef.current);
     setSkipToast({ kind });
-    const ms = kind === 'reminder' ? 2800 : 3200;
+    const ms = kind === 'reminder' ? 4000 : 4500;
     skipToastTimerRef.current = window.setTimeout(() => {
       setSkipToast(null);
       skipToastTimerRef.current = null;
@@ -262,6 +269,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
   const goNext = useCallback(() => {
     if (!currentGuid || ended) return;
 
+    // Cevapsız ilerlemede nazik iki adımlı uyarı (zorunlu / isteğe bağlı ayrımı yok; gömülü önizlemede tutarlı).
     if (currentQuestion && !isQuestionAnswered(currentQuestion)) {
       if (skipArmedGuid !== currentGuid) {
         setSkipArmedGuid(currentGuid);
@@ -318,6 +326,12 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     }
   }, [currentGuid, ended, currentQuestion, skipArmedGuid, answers, textAnswers, ratingAnswers, matrixAnswers, sortedQuestions, conditions, sequentialEdges, showSkipToast]);
 
+  goNextRef.current = goNext;
+
+  const goNextAfterAnswer = useCallback(() => {
+    goNextRef.current();
+  }, []);
+
   const goPrev = useCallback(() => {
     if (path.length <= 1) return;
     if (ended) {
@@ -332,21 +346,29 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
 
   const selectAnswer = useCallback(
     (questionGuid: string, answer: string, isMultiple: boolean) => {
-      setAnswers((prev) => {
-        const current = prev[questionGuid] ?? [];
-        if (isMultiple) {
-          const exists = current.includes(answer);
-          return {
-            ...prev,
-            [questionGuid]: exists
-              ? current.filter((a) => a !== answer)
-              : [...current, answer],
-          };
-        }
-        return { ...prev, [questionGuid]: [answer] };
+      // Tek seçimde hemen ardından goNext çağrılıyor; state güncellenmeden önce gitmesin.
+      flushSync(() => {
+        setAnswers((prev) => {
+          const current = prev[questionGuid] ?? [];
+          if (isMultiple) {
+            const exists = current.includes(answer);
+            return {
+              ...prev,
+              [questionGuid]: exists
+                ? current.filter((a) => a !== answer)
+                : [...current, answer],
+            };
+          }
+          // Tek seçim: aynı seçeneğe tekrar tıklanınca kaldır
+          if (current.length === 1 && current[0] === answer) {
+            return { ...prev, [questionGuid]: [] };
+          }
+          return { ...prev, [questionGuid]: [answer] };
+        });
       });
+      disarmSkipForQuestion(questionGuid);
     },
-    [],
+    [disarmSkipForQuestion],
   );
 
   const getSelectedAnswers = useCallback(
@@ -359,8 +381,9 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
   const setTextAnswer = useCallback(
     (questionGuid: string, text: string) => {
       setTextAnswers((prev) => ({ ...prev, [questionGuid]: text }));
+      disarmSkipForQuestion(questionGuid);
     },
-    [],
+    [disarmSkipForQuestion],
   );
 
   const getTextAnswer = useCallback(
@@ -373,8 +396,9 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
   const setRatingAnswer = useCallback(
     (questionGuid: string, value: number) => {
       setRatingAnswers((prev) => ({ ...prev, [questionGuid]: value }));
+      disarmSkipForQuestion(questionGuid);
     },
-    [],
+    [disarmSkipForQuestion],
   );
 
   const getRatingAnswer = useCallback(
@@ -405,8 +429,9 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
           [questionGuid]: { ...questionMatrix, [rowIndex]: newRow },
         };
       });
+      disarmSkipForQuestion(questionGuid);
     },
-    [],
+    [disarmSkipForQuestion],
   );
 
   const getMatrixAnswer = useCallback(
@@ -419,8 +444,9 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
   const setSortableAnswer = useCallback(
     (questionGuid: string, orderedItems: string[]) => {
       setSortableAnswers((prev) => ({ ...prev, [questionGuid]: orderedItems }));
+      disarmSkipForQuestion(questionGuid);
     },
-    [],
+    [disarmSkipForQuestion],
   );
 
   const getSortableAnswer = useCallback(
@@ -463,6 +489,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     isSurveyValid,
     skipToast,
     goNext,
+    goNextAfterAnswer,
     goPrev,
     // Choice
     selectAnswer,

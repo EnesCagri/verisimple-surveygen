@@ -4,6 +4,7 @@ import { usePreview } from '../../hooks/usePreview';
 import { ProgressBar } from './ProgressBar';
 import { PreviewQuestion } from './PreviewQuestion';
 import { LiveFlowPanel } from './LiveFlowPanel';
+import { SkipToastBanner } from './SkipToastBanner';
 
 interface PreviewPageProps {
   title: string;
@@ -28,6 +29,7 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
     isSurveyValid,
     skipToast,
     goNext,
+    goNextAfterAnswer,
     goPrev,
     selectAnswer,
     setTextAnswer,
@@ -140,33 +142,7 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-base-100 flex flex-col">
-      {skipToast && (
-        <div
-          className="fixed bottom-4 right-4 z-[70] max-w-[min(100vw-2rem,22rem)] animate-[fadeSlideIn_0.25s_ease-out]"
-          role="status"
-        >
-          <div
-            className={`rounded-2xl border px-4 py-3 text-sm font-medium leading-snug shadow-md ${
-              skipToast.kind === 'reminder'
-                ? 'border-amber-200/80 bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50 text-amber-950 dark:border-amber-200/70 dark:from-amber-50 dark:via-orange-50 dark:to-amber-100 dark:text-amber-950'
-                : 'border-rose-200/80 bg-gradient-to-br from-rose-50 via-red-50 to-pink-50 text-rose-900 dark:border-rose-200/70 dark:from-rose-50 dark:via-red-50 dark:to-pink-50 dark:text-rose-900'
-            }`}
-          >
-            {skipToast.kind === 'reminder' ? (
-              <>
-                Lütfen mümkünse bu soruyu yanıtlayın. Boş geçmek istiyorsanız <strong className="font-semibold">İleri</strong>&apos;ye bir kez daha
-                basın.
-              </>
-            ) : (
-              <>
-                Bu soruyu yanıtsız bıraktınız — anlıyoruz. Anket kalitesi için mümkünse diğer soruları eksiksiz yanıtlamanızı rica
-                ederiz.
-              </>
-            )}
-          </div>
-        </div>
-      )}
+    <div className="fixed inset-0 z-50 flex flex-col bg-base-100 isolate">
       <PreviewHeader
         title={title}
         onClose={onClose}
@@ -178,8 +154,9 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
 
       {/* Main body = Question + optional flow panel */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden p-3 sm:p-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pb-14 sm:p-6 sm:pb-20">
           {mobilePreview ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center">
             <div className="mockup-phone shadow-2xl">
               <div className="mockup-phone-camera" />
               <div className="mockup-phone-display">
@@ -202,7 +179,7 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                           question={currentQuestion}
                           selectedAnswers={getSelectedAnswers(currentQuestion.guid)}
                           onSelectAnswer={selectAnswer}
-                          onSingleChoiceNext={goNext}
+                          onSingleChoiceNext={goNextAfterAnswer}
                           textValue={getTextAnswer(currentQuestion.guid)}
                           onTextChange={setTextAnswer}
                           ratingValue={getRatingAnswer(currentQuestion.guid)}
@@ -217,10 +194,17 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                     </div>
                   </div>
 
-                  {/* Navigation buttons */}
-                  <div className="shrink-0 border-t border-base-300/30 bg-base-100 px-5 py-3">
+                  {/* Toast: akışta (overflow:hidden mockup’ta absolute kırpılmasın), butonların hemen üstü */}
+                  <div className="relative z-20 shrink-0 border-t border-base-300/30 bg-base-100 px-5 pb-3 pt-2">
+                    {skipToast && (
+                      <div className="pointer-events-none mb-2 flex justify-center animate-[fadeSlideIn_0.25s_ease-out]">
+                        <div className="w-full max-w-xs sm:max-w-sm">
+                          <SkipToastBanner kind={skipToast.kind} />
+                        </div>
+                      </div>
+                    )}
                     {isCurrentQuestionRequired && !isCurrentQuestionAnswered && (
-                      <div className="mb-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-warning/10 border border-warning/20 text-warning text-xs">
+                      <div className="mb-2 flex items-center gap-2 rounded-xl border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <circle cx="12" cy="12" r="10" />
                           <path d="M12 8v4" />
@@ -252,10 +236,11 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                 </div>
               </div>
             </div>
+            </div>
           ) : (
-            <div className="w-full min-h-0 flex flex-col bg-base-100">
+            <div className="flex h-full min-h-0 w-full flex-col bg-base-100 sm:mx-auto sm:max-w-xl">
               {/* Progress */}
-              <div className="px-6 sm:px-0 w-full pt-3 sm:pt-4 sm:max-w-xl sm:mx-auto shrink-0">
+              <div className="w-full shrink-0 px-6 pt-3 sm:px-0 sm:pt-4">
                 <ProgressBar
                   progress={progress}
                   currentStep={currentStep}
@@ -263,16 +248,16 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                 />
               </div>
 
-              {/* Question content */}
-              <div className="flex-1 min-h-0 flex items-center justify-center overflow-y-auto">
-                <div className="w-full max-w-2xl px-6 py-4 sm:py-8">
+              {/* Question content — kayar; üstten hizalı, alt nav sabit */}
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="w-full max-w-2xl px-6 py-4 sm:mx-auto sm:py-6">
                   {currentQuestion && (
                     <PreviewQuestion
                       key={currentQuestion.guid}
                       question={currentQuestion}
                       selectedAnswers={getSelectedAnswers(currentQuestion.guid)}
                       onSelectAnswer={selectAnswer}
-                      onSingleChoiceNext={goNext}
+                      onSingleChoiceNext={goNextAfterAnswer}
                       textValue={getTextAnswer(currentQuestion.guid)}
                       onTextChange={setTextAnswer}
                       ratingValue={getRatingAnswer(currentQuestion.guid)}
@@ -286,12 +271,18 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                 </div>
               </div>
 
-              {/* Navigation buttons */}
-              <div className="border-t border-base-300/30 bg-base-100">
-                <div className="max-w-xl mx-auto px-6 py-4">
-                  {/* Required warning */}
+              {/* Nav + toast: akışta, gömülü / overflow-hidden üstlerde güvenli */}
+              <div className="relative z-20 shrink-0 border-t border-base-300/30 bg-base-100">
+                <div className="mx-auto max-w-xl px-6 pb-3 pt-2">
+                  {skipToast && (
+                    <div className="pointer-events-none mb-2 flex justify-center animate-[fadeSlideIn_0.25s_ease-out]">
+                      <div className="w-full max-w-sm">
+                        <SkipToastBanner kind={skipToast.kind} />
+                      </div>
+                    </div>
+                  )}
                   {isCurrentQuestionRequired && !isCurrentQuestionAnswered && (
-                    <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-warning/10 border border-warning/20 text-warning text-sm">
+                    <div className="mb-3 flex items-center gap-2 rounded-xl border border-warning/20 bg-warning/10 px-3 py-2 text-sm text-warning">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" />
                         <path d="M12 8v4" />

@@ -69,19 +69,27 @@ export function QuestionNodeTooltip({
   const icon = typeIcons[type];
   const typeLabel = questionTypeLabels[type];
   const typeDesc = questionTypeDescriptions[type];
+  const isControl = settings?.isControlQuestion === true;
 
   return (
     <div className="w-[320px] bg-neutral/95 backdrop-blur-lg text-neutral-content rounded-2xl shadow-2xl shadow-black/20 animate-tooltip-in overflow-hidden">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-white/10">
         <div className="flex items-center gap-2.5 mb-2">
-          <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary text-primary-content text-sm font-bold shrink-0">
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${isControl ? 'bg-accent text-accent-content' : 'bg-primary text-primary-content'}`}
+          >
             {order}
           </span>
-          <div className="flex items-center gap-1.5 text-primary/80">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 text-primary/80">
             {icon}
             <span className="text-[12px] font-semibold">{typeLabel}</span>
           </div>
+          {isControl && (
+            <span className="shrink-0 rounded-md border border-accent/40 bg-accent/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent">
+              Kontrol
+            </span>
+          )}
         </div>
         <p className="text-[13px] font-medium leading-snug text-neutral-content/90">
           {text || 'Soru metni girilmemiş'}
