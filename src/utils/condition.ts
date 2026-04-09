@@ -7,6 +7,8 @@ import { QuestionType } from '../types/survey';
 const labels: Record<ConditionOperator, string> = {
   any: 'Herhangi',
   equals: '=',
+  choice_unanswered: 'Boş geçme',
+  equals_any: 'Şıklardan biri',
   eq: '=',
   gt: '>',
   gte: '≥',
@@ -35,7 +37,9 @@ export function operatorsForType(
     case QuestionType.MultipleChoice:
       return [
         { value: 'any', label: 'Herhangi bir cevap' },
-        { value: 'equals', label: 'Eşittir' },
+        { value: 'equals', label: 'Eşittir (tek şık)' },
+        { value: 'equals_any', label: 'Şıklardan biri (veya)' },
+        { value: 'choice_unanswered', label: 'Boş geçme (yanıt yok)' },
       ];
     case QuestionType.Rating:
       return [
@@ -64,14 +68,6 @@ export function operatorsForType(
       return [
         { value: 'any', label: 'Herhangi bir sıralama' },
       ];
-    case QuestionType.RichText:
-      return [
-        { value: 'any', label: 'Herhangi bir yanıt' },
-        { value: 'is_not_empty', label: 'Boş değil' },
-        { value: 'is_empty', label: 'Boş' },
-        { value: 'contains', label: 'İçerir' },
-        { value: 'not_contains', label: 'İçermez' },
-      ];
     default:
       return [{ value: 'any', label: 'Herhangi' }];
   }
@@ -82,7 +78,7 @@ export function operatorsForType(
  * (is_empty / is_not_empty / any don't need one)
  */
 export function operatorNeedsValue(op: ConditionOperator): boolean {
-  return !['any', 'is_empty', 'is_not_empty'].includes(op);
+  return !['any', 'is_empty', 'is_not_empty', 'choice_unanswered'].includes(op);
 }
 
 /**
@@ -111,8 +107,21 @@ export function evaluateCondition(
 
   switch (question.type) {
     case QuestionType.SingleChoice:
-    case QuestionType.MultipleChoice:
-      return op === 'equals' && choiceAnswers.includes(value);
+    case QuestionType.MultipleChoice: {
+      if (op === 'choice_unanswered') return choiceAnswers.length === 0;
+      if (op === 'equals') return choiceAnswers.includes(value);
+      if (op === 'equals_any') {
+        const vals =
+          rule.answerValues && rule.answerValues.length > 0
+            ? rule.answerValues
+            : value
+              ? [value]
+              : [];
+        if (vals.length === 0) return false;
+        return choiceAnswers.some((c) => vals.includes(c));
+      }
+      return false;
+    }
 
     case QuestionType.Rating: {
       const target = Number(value);
@@ -163,6 +172,18 @@ export function conditionDescription(
   if (op === 'any') return 'Herhangi bir cevap';
 
   switch (op) {
+    case 'choice_unanswered':
+      return 'Yanıt yok (boş geçme)';
+    case 'equals_any': {
+      const vals =
+        rule.answerValues && rule.answerValues.length > 0
+          ? rule.answerValues
+          : rule.answer
+            ? [rule.answer]
+            : [];
+      if (vals.length === 0) return '(şık seçilmedi)';
+      return vals.map((v) => `"${v}"`).join(' veya ');
+    }
     case 'equals':
       return `"${rule.answer}"`;
     case 'eq':

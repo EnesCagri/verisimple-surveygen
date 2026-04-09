@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { Question, ConditionalRule, SequentialEdges } from '../types/survey';
+import { isQuestionRequired } from '../utils/questionRequired';
 import { evaluateCondition } from '../utils/condition';
 
 /**
@@ -34,7 +35,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
   const [ended, setEnded] = useState(false);
   const [endedInvalid, setEndedInvalid] = useState(false);
   const [skipArmedGuid, setSkipArmedGuid] = useState<string | null>(null);
-  const [skipToast, setSkipToast] = useState<null | { kind: 'reminder' | 'ack' }>(null);
+  const [skipToast, setSkipToast] = useState<null | { kind: 'reminder' | 'ack' | 'required' }>(null);
   const skipToastTimerRef = useRef<number | null>(null);
   /** flushSync sonrası aynı tıklamada çağrılan goNext eski closure’da kalmasın (tek seçimde yanlış “atla” uyarısı). */
   const goNextRef = useRef<() => void>(() => {});
@@ -43,7 +44,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     setSkipArmedGuid((armed) => (armed === guid ? null : armed));
   }, []);
 
-  const showSkipToast = useCallback((kind: 'reminder' | 'ack') => {
+  const showSkipToast = useCallback((kind: 'reminder' | 'ack' | 'required') => {
     if (skipToastTimerRef.current) window.clearTimeout(skipToastTimerRef.current);
     setSkipToast({ kind });
     const ms = kind === 'reminder' ? 4000 : 4500;
@@ -100,6 +101,7 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
         return (answers[guid] ?? []).length > 0;
 
       case 3: // TextEntry
+        if (question.settings?.richInformationOnly) return true;
         return (textAnswers[guid] ?? '').trim().length > 0;
 
       case 7: // Rating
@@ -112,15 +114,6 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
       case 6: // Sortable
         // Sortable is always "answered" once the user sees it (order is implicit)
         return true;
-
-      case 8: // RichText
-        if (question.settings?.hasResponse) {
-          const html = textAnswers[guid] ?? '';
-          // Strip HTML tags and check if there's actual text content
-          const text = html.replace(/<[^>]*>/g, '').trim();
-          return text.length > 0;
-        }
-        return true; // No response required for info-only blocks
 
       default:
         return true; // Unknown type, allow proceeding
@@ -269,8 +262,11 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
   const goNext = useCallback(() => {
     if (!currentGuid || ended) return;
 
-    // Cevapsız ilerlemede nazik iki adımlı uyarı (zorunlu / isteğe bağlı ayrımı yok; gömülü önizlemede tutarlı).
     if (currentQuestion && !isQuestionAnswered(currentQuestion)) {
+      if (isQuestionRequired(currentQuestion)) {
+        showSkipToast('required');
+        return;
+      }
       if (skipArmedGuid !== currentGuid) {
         setSkipArmedGuid(currentGuid);
         showSkipToast('reminder');
@@ -470,12 +466,6 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     if (skipToastTimerRef.current) window.clearTimeout(skipToastTimerRef.current);
   }, [sortedQuestions]);
 
-  // Check if current question is required and answered
-  const isCurrentQuestionRequired = currentQuestion?.required ?? false;
-  const isCurrentQuestionAnswered = currentQuestion
-    ? isQuestionAnswered(currentQuestion)
-    : true;
-
   return {
     currentStep: currentStepIndex,
     currentQuestion,
@@ -484,8 +474,6 @@ export function usePreview(questions: Question[], conditions: ConditionalRule[] 
     isFirst,
     isLast,
     isCompleted,
-    isCurrentQuestionRequired,
-    isCurrentQuestionAnswered,
     isSurveyValid,
     skipToast,
     goNext,

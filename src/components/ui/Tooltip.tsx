@@ -77,7 +77,7 @@ export function Tooltip({
           role="tooltip"
         >
           <div className="relative bg-neutral/95 backdrop-blur-md text-neutral-content rounded-xl shadow-xl shadow-black/10 animate-tooltip-in">
-            <div className="px-3.5 py-2 text-[12px] leading-relaxed font-medium max-w-[280px]">
+            <div className="px-4 py-2.5 text-sm leading-relaxed font-medium max-w-[22rem]">
               {content}
             </div>
             {/* Arrow */}

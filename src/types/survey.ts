@@ -6,7 +6,6 @@ export const QuestionType = {
   MatrixLikert: 5,
   Sortable: 6,
   Rating: 7,
-  RichText: 8,
 } as const;
 
 export type QuestionType = typeof QuestionType[keyof typeof QuestionType];
@@ -36,15 +35,15 @@ export interface QuestionSettings {
   /** Whether each row allows single or multiple selections */
   matrixType?: 'single' | 'multiple';
 
-  /* ── RichText ── */
-  /** Rich text / HTML content displayed to the respondent */
+  /* ── Soru metni (tüm tipler) ── */
+  /** Açıksa soru kökü `richContent` ile HTML olarak gösterilir; kapalıysa düz `text` */
+  useRichQuestionText?: boolean;
+  /** Biçimlendirilmiş soru metni (HTML); yalnızca useRichQuestionText ile birlikte */
   richContent?: string;
-  /** Whether this block also collects a text response from the user */
-  hasResponse?: boolean;
-  /** Max character limit for the response (only when hasResponse is true) */
-  responseMaxLength?: number;
-  /** Placeholder for the response input */
-  responsePlaceholder?: string;
+  /**
+   * Metin girişi: yalnızca bilgilendirme (yanıt alanı yok). Eski tip 8 (Zengin Metin) migrasyonu.
+   */
+  richInformationOnly?: boolean;
 
   /* ── Control Question ── */
   /** Whether this is a control/attention check question */
@@ -53,8 +52,11 @@ export interface QuestionSettings {
   correctAnswer?: string[];
 
   /* ── Answer Images ── */
-  /** Map of answer text → image URL/base64 for choice questions with image options */
+  /** Şık metni veya boş satır için `__slot_{index}` → data URL (base64) veya harici görsel URL */
   answerImages?: Record<string, string>;
+
+  /** Tek/çoklu seçim ve sıralama: katılımcıya gösterim sırası karıştırılır (düzenleyicideki sıra korunur) */
+  randomizeAnswerOrder?: boolean;
 
   // Future:
   // hasOtherOption?: boolean;  // Choice: "Diğer" text field
@@ -68,7 +70,7 @@ export interface Question {
   guid: string;
   /** Type-specific configuration. Omitted when not needed. */
   settings?: QuestionSettings;
-  /** Whether this question is required (must be answered before proceeding) */
+  /** Yalnızca `false` isteğe bağlı; yok / `true` → zorunlu (önizleme ve taker ile aynı). */
   required?: boolean;
   /** Optional image URL/base64 displayed alongside the question text */
   image?: string;
@@ -101,6 +103,10 @@ export type ConditionAction =
 export type ConditionOperator =
   | 'any'
   | 'equals'
+  /** Tek seçim / çoklu seçim: yanıt yok (zorunlu olmayan soruda boş geçme) */
+  | 'choice_unanswered'
+  /** Şu veya bu şık (seçilen değerlerden herhangi biri) */
+  | 'equals_any'
   | 'eq' | 'gt' | 'gte' | 'lt' | 'lte'
   | 'contains' | 'not_contains' | 'exact' | 'is_empty' | 'is_not_empty'
   | 'row_equals';
@@ -117,6 +123,8 @@ export interface ConditionalRule {
   sourceQuestionId: string;
   /** Comparison value (answer text, number-as-string, substring, column label, or '*') */
   answer: string;
+  /** `equals_any` için şık listesi (VEYA); köprü / API ile senkron */
+  answerValues?: string[];
   action: ConditionAction;
   /** Comparison operator. Defaults to 'equals' for choices, 'any' for '*'. */
   operator?: ConditionOperator;
@@ -129,6 +137,7 @@ export interface ConditionalRule {
  */
 export interface ConditionInput {
   answer: string;
+  answerValues?: string[];
   action: ConditionAction;
   operator?: ConditionOperator;
   rowIndex?: number;

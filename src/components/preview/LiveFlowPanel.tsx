@@ -17,8 +17,10 @@ import type { Question, ConditionalRule, NodePositions } from '../../types/surve
 import { LiveFlowNode, type LiveFlowNodeData } from './LiveFlowNode';
 import { LiveFlowEndNode, type LiveFlowEndNodeData } from './LiveFlowEndNode';
 import { LiveFlowStartNode, type LiveFlowStartNodeData } from './LiveFlowStartNode';
-import { conditionDescription } from '../../utils/condition';
+import { conditionDescription, operatorLabel } from '../../utils/condition';
 import type { ConditionSummary } from '../flow/QuestionNodeTooltip';
+import type { ConditionOperator } from '../../types/survey';
+import { questionListPlainText } from '../../utils/questionDisplayText';
 
 const START_NODE_ID = '__start__';
 const END_NODE_ID = '__end__';
@@ -41,6 +43,28 @@ interface LiveFlowPanelProps {
   /** Whether the survey has ended */
   isCompleted: boolean;
   onClose: () => void;
+}
+
+function buildEdgeLabel(rule: ConditionalRule, questions: Question[]): string {
+  const src = questions.find((q) => q.guid === rule.sourceQuestionId);
+  const op = rule.operator ?? (rule.answer === '*' ? 'any' : 'equals');
+  if (op === 'any') return 'Herhangi';
+  if (op === 'choice_unanswered') return 'Boş geçme';
+  if (op === 'equals') return rule.answer;
+  if (op === 'equals_any') {
+    const vals =
+      rule.answerValues && rule.answerValues.length > 0
+        ? rule.answerValues
+        : rule.answer
+          ? [rule.answer]
+          : [];
+    return vals.length ? vals.join(' veya ') : 'Şıklardan biri';
+  }
+  if (op === 'row_equals' && src?.settings?.rows && rule.rowIndex !== undefined) {
+    const rowLabel = src.settings.rows[rule.rowIndex] ?? `Satır ${rule.rowIndex + 1}`;
+    return `${rowLabel} → ${rule.answer}`;
+  }
+  return `${operatorLabel(op as ConditionOperator)} ${rule.answer}`;
 }
 
 /* ── Build nodes ── */
@@ -116,7 +140,7 @@ function buildNodes(
       position: savedPos ?? defaultPos,
       data: {
         order: q.order,
-        text: q.text,
+        text: questionListPlainText(q),
         type: q.type,
         guid: q.guid,
         answers: q.answers,
@@ -257,6 +281,8 @@ function buildEdges(
     const isEnd = rule.action.type === 'end_survey';
     const activeColor = isEnd ? 'oklch(65% 0.2 25)' : 'oklch(62% 0.19 281)';
     const inactiveColor = 'oklch(88% 0.01 280)';
+    const label = buildEdgeLabel(rule, questions);
+    const edgeColor = isTraversed ? activeColor : inactiveColor;
 
     edges.push({
       id: `cond-${rule.id}`,
@@ -264,14 +290,19 @@ function buildEdges(
       target,
       type: 'smoothstep',
       animated: isTraversed,
+      label,
+      labelStyle: { fontSize: 11, fontWeight: 600, fill: edgeColor },
+      labelBgStyle: { fill: 'oklch(98% 0 0)', fillOpacity: 0.85 },
+      labelBgPadding: [6, 4] as [number, number],
+      labelBgBorderRadius: 6,
       style: {
-        stroke: isTraversed ? activeColor : inactiveColor,
+        stroke: edgeColor,
         strokeWidth: isTraversed ? 2.5 : 1.5,
         strokeDasharray: isTraversed ? undefined : '4 3',
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: isTraversed ? activeColor : inactiveColor,
+        color: edgeColor,
         width: 12,
         height: 12,
       },

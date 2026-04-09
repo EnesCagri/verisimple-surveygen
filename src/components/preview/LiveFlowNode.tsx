@@ -52,13 +52,6 @@ const typeIcons: Record<QuestionType, React.JSX.Element> = {
       <line x1="12" y1="6" x2="21" y2="6" /><line x1="12" y1="12" x2="21" y2="12" /><line x1="12" y1="18" x2="21" y2="18" />
     </svg>
   ),
-  [QuestionType.RichText]: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-    </svg>
-  ),
 };
 
 function LiveFlowNodeComponent({ data }: NodeProps) {
@@ -109,7 +102,7 @@ function LiveFlowNodeComponent({ data }: NodeProps) {
 
           <span
             className={`
-              flex items-center justify-center w-7 h-7 rounded-lg text-[11px] font-bold shrink-0
+              flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold shrink-0
               ${isActive
                 ? 'bg-primary text-primary-content'
                 : isVisited
@@ -130,7 +123,7 @@ function LiveFlowNodeComponent({ data }: NodeProps) {
 
           {/* Condition indicator */}
           {conditions.length > 0 && (
-            <span className="ml-auto flex items-center justify-center w-5 h-5 rounded-full bg-warning/15 text-[10px] font-bold text-warning">
+            <span className="ml-auto flex items-center justify-center w-6 h-6 rounded-full bg-warning/15 text-xs font-bold text-warning">
               {conditions.length}
             </span>
           )}
@@ -138,7 +131,7 @@ function LiveFlowNodeComponent({ data }: NodeProps) {
 
         <p
           className={`
-            text-[12px] leading-relaxed mt-2.5 line-clamp-2 font-medium
+            text-sm leading-relaxed mt-2.5 line-clamp-2 font-medium
             ${isActive
               ? 'text-base-content/80'
               : isVisited
@@ -149,6 +142,43 @@ function LiveFlowNodeComponent({ data }: NodeProps) {
         >
           {text || 'Soru metni...'}
         </p>
+
+        {conditions.length > 0 && (
+          <div className="mt-2.5 border-t border-base-300/30 pt-2 space-y-1.5">
+            <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-warning/90">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-80">
+                <path d="M12 3v6" />
+                <circle cx="12" cy="12" r="3" />
+                <path d="m8 15-3 3h14l-3-3" />
+              </svg>
+              Koşullar
+            </div>
+            <ul className="space-y-1">
+              {conditions.slice(0, 4).map((c, i) => (
+                <li key={i} className="flex items-start gap-2 text-[11px] leading-snug">
+                  <span className="text-warning/80 mt-0.5 shrink-0 font-bold">→</span>
+                  <span
+                    className={`flex-1 min-w-0 break-words ${
+                      isActive ? 'text-base-content/70' : isVisited ? 'text-base-content/55' : 'text-base-content/40'
+                    }`}
+                  >
+                    {c.description}
+                  </span>
+                  <span
+                    className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold tabular-nums ${
+                      c.isEnd ? 'bg-error/15 text-error border border-error/25' : 'bg-success/15 text-success border border-success/25'
+                    }`}
+                  >
+                    {c.actionLabel}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {conditions.length > 4 && (
+              <p className="text-[10px] text-base-content/40 pl-4">+{conditions.length - 4} koşul daha…</p>
+            )}
+          </div>
+        )}
 
         <Handle type="source" position={Position.Bottom} className="!w-2.5 !h-2.5 !bg-primary/50 !border-0 !-bottom-1.5" />
       </div>

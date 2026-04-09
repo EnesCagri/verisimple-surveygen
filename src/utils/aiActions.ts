@@ -47,7 +47,10 @@ interface AIAddCondition {
   type: 'add_condition';
   sourceQuestionOrder: number;
   operator?: string;
-  answer: string;
+  /** Tek şık / çoğu operatör için */
+  answer?: string;
+  /** equals_any için şık listesi */
+  answerValues?: string[];
   actionType: 'end_survey' | 'jump_to';
   targetQuestionOrder?: number;
   rowIndex?: number;
@@ -90,6 +93,7 @@ interface AIUpdateCondition {
   oldAnswer: string;
   updates: {
     answer?: string;
+    answerValues?: string[];
     operator?: string;
     actionType?: 'end_survey' | 'jump_to';
     targetQuestionOrder?: number;
@@ -290,10 +294,16 @@ export function executeAIActions(
             break;
           }
 
+          const op = (action.operator as ConditionOperator) ?? undefined;
+          const multi =
+            op === 'equals_any' && action.answerValues && action.answerValues.length > 0
+              ? action.answerValues
+              : undefined;
           const input: ConditionInput = {
-            answer: action.answer ?? '*',
+            answer: multi ? multi[0] : (action.answer ?? '*'),
+            answerValues: multi,
             action: condAction,
-            operator: (action.operator as ConditionOperator) ?? undefined,
+            operator: op,
             rowIndex: action.rowIndex,
           };
           mutators.addCondition(src.guid, input);
@@ -352,10 +362,20 @@ export function executeAIActions(
             if (built) newAction = built;
           }
 
+          const newOp = (action.updates.operator as ConditionOperator) ?? match.operator;
+          let useMulti: string[] | undefined;
+          if (newOp === 'equals_any') {
+            const vals =
+              action.updates.answerValues !== undefined
+                ? action.updates.answerValues
+                : match.answerValues;
+            useMulti = vals && vals.length > 0 ? [...vals] : undefined;
+          }
           const updatedInput: ConditionInput = {
-            answer: newAnswer,
+            answer: useMulti ? useMulti[0] : newAnswer,
+            answerValues: useMulti,
             action: newAction,
-            operator: (action.updates.operator as ConditionOperator) ?? match.operator,
+            operator: newOp,
             rowIndex: action.updates.rowIndex ?? match.rowIndex,
           };
           mutators.updateCondition(match.id, updatedInput);
@@ -470,12 +490,18 @@ export function executeAIActions(
               const condAction = buildConditionAction(cDef, newQuestions);
               if (!condAction) continue;
 
+              const rop = (cDef.operator as ConditionOperator) ?? undefined;
+              const rmulti =
+                rop === 'equals_any' && cDef.answerValues && cDef.answerValues.length > 0
+                  ? cDef.answerValues
+                  : undefined;
               newConditions.push({
                 id: generateId(),
                 sourceQuestionId: src.guid,
-                answer: cDef.answer ?? '*',
+                answer: rmulti ? rmulti[0] : (cDef.answer ?? '*'),
+                ...(rmulti ? { answerValues: rmulti } : {}),
                 action: condAction,
-                operator: (cDef.operator as ConditionOperator) ?? undefined,
+                operator: rop,
                 rowIndex: cDef.rowIndex,
               });
             }
@@ -500,7 +526,7 @@ export function executeAIActions(
 // ── Helpers ──
 
 function toQuestionType(n: number): QuestionType {
-  const valid = [1, 2, 3, 5, 6, 7, 8];
+  const valid = [1, 2, 3, 5, 6, 7];
   return valid.includes(n) ? (n as QuestionType) : QuestionType.SingleChoice;
 }
 
@@ -519,25 +545,21 @@ function getDefaultSettings(type: QuestionType): QuestionSettings | undefined {
       };
     case QuestionType.Sortable:
       return {};
-    case QuestionType.RichText:
-      return {
-        richContent: '',
-        hasResponse: false,
-        responseMaxLength: 2000,
-        responsePlaceholder: 'Cevabınızı yazın...',
-      };
     default:
       return undefined;
   }
 }
 
 function buildQuestion(def: AIQuestionDef, order: number): Question {
-  const type = toQuestionType(def.questionType);
+  const legacyRich = def.questionType === 8;
+  const type = legacyRich ? QuestionType.TextEntry : toQuestionType(def.questionType);
   const question: Question = {
     order,
     text: def.text ?? '',
     type,
-    answers: def.answers ?? (type <= 2 || type === QuestionType.Sortable ? [''] : []),
+    answers: legacyRich
+      ? []
+      : def.answers ?? (type <= 2 || type === QuestionType.Sortable ? [''] : []),
     guid: generateId(),
   };
 
@@ -545,7 +567,25 @@ function buildQuestion(def: AIQuestionDef, order: number): Question {
     question.required = def.required;
   }
 
-  if (def.settings && Object.keys(def.settings).length > 0) {
+  if (legacyRich) {
+    const s = (def.settings ?? {}) as Record<string, unknown>;
+    const hasResponse = s.hasResponse === true;
+    if (!hasResponse) {
+      question.required = false;
+    }
+    question.settings = {
+      useRichQuestionText: true,
+      richContent: String(s.richContent ?? def.text ?? ''),
+      richInformationOnly: !hasResponse,
+      ...(hasResponse
+        ? {
+            maxLength: typeof s.responseMaxLength === 'number' ? s.responseMaxLength : 2000,
+            placeholder:
+              typeof s.responsePlaceholder === 'string' ? s.responsePlaceholder : 'Cevabınızı yazın...',
+          }
+        : {}),
+    };
+  } else if (def.settings && Object.keys(def.settings).length > 0) {
     question.settings = def.settings;
   } else {
     const defaults = getDefaultSettings(type);

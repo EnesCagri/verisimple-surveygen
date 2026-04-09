@@ -181,7 +181,7 @@ function MessageBubble({
         )}
 
         {/* Timestamp */}
-        <span className="text-[10px] text-base-content/30 px-1">
+        <span className="text-xs text-base-content/30 px-1">
           {new Date(message.timestamp).toLocaleTimeString('tr-TR', {
             hour: '2-digit',
             minute: '2-digit',
@@ -391,7 +391,7 @@ export function AIChatPanel({
               </svg>
             </button>
           </div>
-          <p className="text-[10px] text-base-content/30 mt-2 text-center">
+          <p className="text-xs text-base-content/30 mt-2 text-center">
             Shift+Enter ile yeni satır · Enter ile gönder
           </p>
         </div>

@@ -62,7 +62,7 @@ export function AnswerItem({
             p-1.5 rounded-lg transition-all duration-150
             ${image
               ? 'text-primary bg-primary/10 hover:bg-primary/20'
-              : 'opacity-0 group-hover:opacity-100 text-base-content/30 hover:text-primary hover:bg-primary/10'
+              : 'opacity-80 text-base-content/40 hover:text-primary hover:bg-primary/10 sm:opacity-0 sm:group-hover:opacity-100 sm:text-base-content/30'
             }
           `}
           onClick={() => {

@@ -24,8 +24,6 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
     isFirst,
     isLast,
     isCompleted,
-    isCurrentQuestionRequired,
-    isCurrentQuestionAnswered,
     isSurveyValid,
     skipToast,
     goNext,
@@ -203,16 +201,6 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                         </div>
                       </div>
                     )}
-                    {isCurrentQuestionRequired && !isCurrentQuestionAnswered && (
-                      <div className="mb-2 flex items-center gap-2 rounded-xl border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" />
-                          <path d="M12 8v4" />
-                          <path d="M12 16h.01" />
-                        </svg>
-                        <span>Bu soru zorunludur</span>
-                      </div>
-                    )}
                     <div className="flex items-center justify-between">
                       <button
                         className={`btn btn-ghost btn-sm rounded-xl gap-1 ${isFirst ? 'invisible' : ''}`}
@@ -279,16 +267,6 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                       <div className="w-full max-w-sm">
                         <SkipToastBanner kind={skipToast.kind} />
                       </div>
-                    </div>
-                  )}
-                  {isCurrentQuestionRequired && !isCurrentQuestionAnswered && (
-                    <div className="mb-3 flex items-center gap-2 rounded-xl border border-warning/20 bg-warning/10 px-3 py-2 text-sm text-warning">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 8v4" />
-                        <path d="M12 16h.01" />
-                      </svg>
-                      <span>Bu soru zorunludur, lütfen cevaplayın</span>
                     </div>
                   )}
 

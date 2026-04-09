@@ -19,6 +19,8 @@ interface ConditionEditorModalProps {
   /** Düzenleme modunda mevcut kural id — kendisiyle çakışma sayılmaz */
   excludeConditionId?: string;
   initialAnswer?: string;
+  /** `equals_any` düzenleme */
+  initialAnswerValues?: string[];
   initialAction?: ConditionAction;
   initialOperator?: ConditionOperator;
   initialRowIndex?: number;
@@ -33,6 +35,7 @@ export function ConditionEditorModal({
   conditions,
   excludeConditionId,
   initialAnswer,
+  initialAnswerValues,
   initialAction,
   initialOperator,
   initialRowIndex,
@@ -42,11 +45,24 @@ export function ConditionEditorModal({
   const qType = sourceQuestion.type;
   const availableOperators = operatorsForType(qType);
 
-  const defaultOp = initialOperator
-    ?? (initialAnswer === '*' ? 'any' : availableOperators[0]?.value ?? 'any');
+  const inferDefaultOperator = (): ConditionOperator => {
+    if (initialOperator != null) return initialOperator;
+    if (initialAnswer === '*') return 'any';
+    if (qType === QuestionType.SingleChoice || qType === QuestionType.MultipleChoice) {
+      return 'equals';
+    }
+    return availableOperators[0]?.value ?? 'any';
+  };
 
-  const [operator, setOperator] = useState<ConditionOperator>(defaultOp);
+  const [operator, setOperator] = useState<ConditionOperator>(inferDefaultOperator);
   const [answerValue, setAnswerValue] = useState(initialAnswer ?? '');
+  const [multiValues, setMultiValues] = useState<string[]>(() =>
+    initialAnswerValues?.length
+      ? [...initialAnswerValues]
+      : initialOperator === 'equals_any' && initialAnswer
+        ? [initialAnswer]
+        : [],
+  );
   const [rowIndex, setRowIndex] = useState(initialRowIndex ?? 0);
 
   const [actionType, setActionType] = useState<'jump_to' | 'end_survey' | 'invalid_end'>(
@@ -68,7 +84,39 @@ export function ConditionEditorModal({
 
   useEffect(() => {
     setDuplicateError(null);
-  }, [operator, answerValue, rowIndex]);
+  }, [operator, answerValue, rowIndex, multiValues]);
+
+  useEffect(() => {
+    if (!open) return;
+    const ops = operatorsForType(sourceQuestion.type);
+    const defOp =
+      initialOperator != null
+        ? initialOperator
+        : initialAnswer === '*'
+          ? 'any'
+          : sourceQuestion.type === QuestionType.SingleChoice ||
+              sourceQuestion.type === QuestionType.MultipleChoice
+            ? 'equals'
+            : ops[0]?.value ?? 'any';
+    setOperator(defOp);
+    setAnswerValue(initialAnswer ?? '');
+    setRowIndex(initialRowIndex ?? 0);
+    setMultiValues(
+      initialAnswerValues?.length
+        ? [...initialAnswerValues]
+        : initialOperator === 'equals_any' && initialAnswer
+          ? [initialAnswer]
+          : [],
+    );
+  }, [
+    open,
+    sourceQuestion.guid,
+    sourceQuestion.type,
+    initialAnswer,
+    initialAnswerValues,
+    initialOperator,
+    initialRowIndex,
+  ]);
 
   if (!open) return null;
 
@@ -77,11 +125,20 @@ export function ConditionEditorModal({
 
   const handleOperatorChange = (newOp: ConditionOperator) => {
     setOperator(newOp);
+    if (newOp === 'equals_any' && answerValue && answerValue !== '*') {
+      setMultiValues((prev) => (prev.length > 0 ? prev : [answerValue]));
+    }
     if (!operatorNeedsValue(newOp)) {
       setAnswerValue('*');
     } else if (answerValue === '*') {
       setAnswerValue('');
     }
+  };
+
+  const toggleMultiAnswer = (ans: string) => {
+    setMultiValues((prev) =>
+      prev.includes(ans) ? prev.filter((a) => a !== ans) : [...prev, ans],
+    );
   };
 
   const handleSave = () => {
@@ -92,10 +149,16 @@ export function ConditionEditorModal({
           ? { type: 'jump_to', targetQuestionId: '__invalid_end__' }
           : { type: 'jump_to', targetQuestionId };
 
-    const answer = !needsValue ? '*' : answerValue;
+    const answer =
+      operator === 'equals_any'
+        ? (multiValues[0] ?? '')
+        : !needsValue
+          ? '*'
+          : answerValue;
 
     const input: ConditionInput = {
       answer,
+      answerValues: operator === 'equals_any' ? multiValues : undefined,
       action,
       operator: operator === 'any' ? undefined : operator,
       rowIndex: operator === 'row_equals' ? rowIndex : undefined,
@@ -118,10 +181,15 @@ export function ConditionEditorModal({
   };
 
   const isValid = (() => {
-    if (!needsValue && operator !== 'any') return actionType === 'end_survey' || actionType === 'invalid_end' || !!targetQuestionId;
-    if (operator === 'any') return actionType === 'end_survey' || actionType === 'invalid_end' || !!targetQuestionId;
+    const actionOk =
+      actionType === 'end_survey' || actionType === 'invalid_end' || !!targetQuestionId;
+    if (operator === 'equals_any') {
+      return multiValues.length > 0 && actionOk;
+    }
+    if (!needsValue && operator !== 'any') return actionOk;
+    if (operator === 'any') return actionOk;
     if (!answerValue && needsValue) return false;
-    return actionType === 'end_survey' || actionType === 'invalid_end' || !!targetQuestionId;
+    return actionOk;
   })();
 
   return (
@@ -168,8 +236,60 @@ export function ConditionEditorModal({
             </select>
           </div>
 
+          {/* Şıklardan biri — kart seçimi (önizleme seçenekleriyle aynı dil) */}
+          {(qType === QuestionType.SingleChoice || qType === QuestionType.MultipleChoice) &&
+            operator === 'equals_any' && (
+              <div>
+                <label className="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-2 block">
+                  Eşleşecek şıklar
+                </label>
+                <div
+                  className="flex flex-col gap-2 max-h-52 overflow-y-auto pr-0.5"
+                  title="Listeden en az birini seçin. Katılımcı seçeneklerden herhangi birini işaretlerse bu koşul sağlanır (VEYA)."
+                >
+                  {sourceQuestion.answers.filter(Boolean).map((ans, i) => {
+                    const selected = multiValues.includes(ans);
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => toggleMultiAnswer(ans)}
+                        className={`
+                          w-full text-left rounded-xl border-2 px-4 py-3 flex items-center gap-3 transition-all duration-200
+                          ${selected
+                            ? 'border-primary bg-primary/5 shadow-sm'
+                            : 'border-base-300/50 bg-base-100 hover:border-base-300/70 hover:bg-base-200/30'
+                          }
+                        `}
+                      >
+                        <span
+                          className={`
+                            shrink-0 w-5 h-5 flex items-center justify-center rounded-md border-2 transition-colors
+                            ${selected
+                              ? 'bg-primary border-primary text-primary-content'
+                              : 'border-base-300/60 bg-base-100'
+                            }
+                          `}
+                          aria-hidden
+                        >
+                          {selected && (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20 6 9 17l-5-5" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className={`text-sm leading-snug ${selected ? 'text-base-content/90 font-medium' : 'text-base-content/75'}`}>
+                          {ans}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
           {/* Value input — depends on question type + operator */}
-          {needsValue && (
+          {needsValue && operator !== 'equals_any' && (
             <div>
               <label className="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-2 block">
                 Değer
@@ -393,7 +513,7 @@ function ConditionValueInput({
       return (
         <div className="space-y-3">
           <div>
-            <p className="text-[11px] text-base-content/50 mb-1">Satır</p>
+            <p className="text-xs text-base-content/50 mb-1">Satır</p>
             <select
               className="select select-bordered w-full rounded-xl text-sm"
               value={rowIndex}
@@ -405,7 +525,7 @@ function ConditionValueInput({
             </select>
           </div>
           <div>
-            <p className="text-[11px] text-base-content/50 mb-1">Seçili Sütun</p>
+            <p className="text-xs text-base-content/50 mb-1">Seçili Sütun</p>
             <select
               className="select select-bordered w-full rounded-xl text-sm"
               value={value}

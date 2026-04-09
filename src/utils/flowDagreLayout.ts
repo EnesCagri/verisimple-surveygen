@@ -54,11 +54,12 @@ export function applyDagreLayout(nodes: Node[], edges: Edge[], direction: 'TB' |
     rankdir: direction,
     align: 'UL',
     ranker: 'tight-tree',
-    ranksep: 80,
+    /** TB: üst-alt sıralar arası boşluk; düşük değerde kenarlar hemen kıvrılır */
+    ranksep: 148,
     nodesep: 104,
     edgesep: 28,
     marginx: 80,
-    marginy: 44,
+    marginy: 56,
     acyclicer: 'greedy',
   });
 

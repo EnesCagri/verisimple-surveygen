@@ -38,6 +38,16 @@ export function ConditionList({
     const op = rule.operator ?? (rule.answer === '*' ? 'any' : 'equals');
 
     if (op === 'any') return 'Herhangi bir cevap';
+    if (op === 'choice_unanswered') return 'Yanıt yok (boş geçme)';
+    if (op === 'equals_any') {
+      const vals =
+        rule.answerValues && rule.answerValues.length > 0
+          ? rule.answerValues
+          : rule.answer
+            ? [rule.answer]
+            : [];
+      return vals.length ? vals.map((v) => `"${v}"`).join(' veya ') : '(şık seçilmedi)';
+    }
     if (op === 'is_empty') return 'Boş';
     if (op === 'is_not_empty') return 'Boş değil';
 
@@ -229,6 +239,7 @@ export function ConditionList({
           conditions={conditions}
           excludeConditionId={editingCondition.id}
           initialAnswer={editingCondition.answer}
+          initialAnswerValues={editingCondition.answerValues}
           initialAction={editingCondition.action}
           initialOperator={editingCondition.operator}
           initialRowIndex={editingCondition.rowIndex}

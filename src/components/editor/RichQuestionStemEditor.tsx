@@ -1,19 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
+import type { Editor } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
-import Link from '@tiptap/extension-link';
-import type { QuestionSettings } from '../../types/survey';
 
-interface RichTextSettingsProps {
-  settings: QuestionSettings;
-  onChange: (settings: QuestionSettings) => void;
+export interface RichQuestionStemEditorProps {
+  html: string;
+  onHtmlChange: (html: string) => void;
 }
-
-const MAX_RESPONSE_LENGTH = 10000;
 
 // Helper function to convert file to base64
 function fileToBase64(file: File): Promise<string> {
@@ -25,16 +22,18 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-// Helper function to handle image files
-async function handleImageFile(file: File, editor: any) {
+async function insertStemImage(
+  file: File,
+  editor: Editor,
+  onError: (message: string) => void,
+) {
   if (!file.type.startsWith('image/')) {
-    alert('Lütfen bir görsel dosyası seçin.');
+    onError('Lütfen bir görsel dosyası seçin.');
     return;
   }
 
-  // Check file size (max 5MB)
   if (file.size > 5 * 1024 * 1024) {
-    alert('Görsel boyutu 5MB\'dan küçük olmalıdır.');
+    onError("Görsel boyutu 5 MB'dan küçük olmalıdır.");
     return;
   }
 
@@ -43,21 +42,31 @@ async function handleImageFile(file: File, editor: any) {
     editor.chain().focus().setImage({ src: base64 }).run();
   } catch (error) {
     console.error('Error loading image:', error);
-    alert('Görsel yüklenirken bir hata oluştu.');
+    onError('Görsel yüklenirken bir hata oluştu.');
   }
 }
 
-export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) {
-  const [hasResponse, setHasResponse] = useState(settings.hasResponse ?? false);
-  const [responseMaxLength, setResponseMaxLength] = useState(settings.responseMaxLength ?? 2000);
-  const [responsePlaceholder, setResponsePlaceholder] = useState(settings.responsePlaceholder ?? 'Cevabınızı yazın...');
+export function RichQuestionStemEditor({ html, onHtmlChange }: RichQuestionStemEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [showLinkInput, setShowLinkInput] = useState(false);
-  const [linkUrl, setLinkUrl] = useState('');
-  const linkInputRef = useRef<HTMLInputElement>(null);
+  const [stemImageError, setStemImageError] = useState<string | null>(null);
+  const editorRef = useRef<Editor | null>(null);
+  const stemErrorReporterRef = useRef<(msg: string) => void>(() => {});
+  stemErrorReporterRef.current = (message: string) => setStemImageError(message);
+
+  useEffect(() => {
+    if (!stemImageError) return;
+    const id = window.setTimeout(() => setStemImageError(null), 6000);
+    return () => window.clearTimeout(id);
+  }, [stemImageError]);
 
   const editor = useEditor({
+    onCreate: ({ editor: ed }) => {
+      editorRef.current = ed;
+    },
+    onDestroy: () => {
+      editorRef.current = null;
+    },
     extensions: [
       StarterKit.configure({
         heading: {
@@ -69,13 +78,6 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
         inline: true,
         allowBase64: true,
       }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          target: '_blank',
-          rel: 'noopener noreferrer',
-        },
-      }),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
@@ -83,9 +85,9 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
         placeholder: 'İçeriğinizi buraya yazın...',
       }),
     ],
-    content: settings.richContent ?? '',
+    content: html ?? '',
     onUpdate: ({ editor }) => {
-      onChange({ ...settings, richContent: editor.getHTML() });
+      onHtmlChange(editor.getHTML());
     },
     editorProps: {
       attributes: {
@@ -96,7 +98,8 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
           const file = event.dataTransfer.files[0];
           if (file.type.startsWith('image/')) {
             event.preventDefault();
-            handleImageFile(file, editor);
+            const ed = editorRef.current;
+            if (ed) void insertStemImage(file, ed, (m) => stemErrorReporterRef.current(m));
             return true;
           }
         }
@@ -110,10 +113,9 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
             if (item.type.startsWith('image/')) {
               event.preventDefault();
               const file = item.getAsFile();
-              if (file) {
-                handleImageFile(file, editor);
-                return true;
-              }
+              const ed = editorRef.current;
+              if (file && ed) void insertStemImage(file, ed, (m) => stemErrorReporterRef.current(m));
+              return true;
             }
           }
         }
@@ -122,28 +124,11 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
     },
   });
 
-  const handleResponseToggle = (enabled: boolean) => {
-    setHasResponse(enabled);
-    onChange({ ...settings, hasResponse: enabled });
-  };
-
-  const handleMaxLengthChange = (val: number) => {
-    const clamped = Math.min(Math.max(val, 50), MAX_RESPONSE_LENGTH);
-    setResponseMaxLength(clamped);
-    onChange({ ...settings, responseMaxLength: clamped });
-  };
-
-  const handlePlaceholderChange = (val: string) => {
-    setResponsePlaceholder(val);
-    onChange({ ...settings, responsePlaceholder: val });
-  };
-
-  // Update editor content when settings.richContent changes externally
   useEffect(() => {
-    if (editor && settings.richContent !== editor.getHTML()) {
-      editor.commands.setContent(settings.richContent ?? '');
+    if (editor && html !== editor.getHTML()) {
+      editor.commands.setContent(html ?? '');
     }
-  }, [settings.richContent, editor]);
+  }, [html, editor]);
 
   // Add drag & drop handlers to editor container
   useEffect(() => {
@@ -169,8 +154,9 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
       setIsDragging(false);
 
       const file = e.dataTransfer?.files[0];
-      if (file && file.type.startsWith('image/')) {
-        await handleImageFile(file, editor);
+      const ed = editorRef.current;
+      if (file && file.type.startsWith('image/') && ed) {
+        await insertStemImage(file, ed, (m) => stemErrorReporterRef.current(m));
       }
     };
 
@@ -185,28 +171,31 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
     };
   }, [editor]);
 
-  // Close link input when clicking outside
-  useEffect(() => {
-    if (!showLinkInput) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.link-input-container')) {
-        setShowLinkInput(false);
-        setLinkUrl('');
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLinkInput]);
-
   if (!editor) {
     return <div className="h-48 bg-base-200/30 rounded-xl animate-pulse" />;
   }
 
   return (
     <div className="space-y-5">
+      {stemImageError && (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-3 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-base-content/80"
+        >
+          <span>{stemImageError}</span>
+          <button
+            type="button"
+            className="shrink-0 rounded-lg p-1 text-base-content/50 hover:bg-base-200/80 hover:text-base-content"
+            onClick={() => setStemImageError(null)}
+            aria-label="Kapat"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
       {/* Rich Text Editor */}
       <div>
         <p className="text-sm font-medium text-base-content/60 mb-2">İçerik Düzenleyici</p>
@@ -389,7 +378,7 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
 
             <div className="w-px h-5 bg-base-300/60 mx-1" />
 
-            {/* Image and Link */}
+            {/* Image */}
             <input
               ref={fileInputRef}
               type="file"
@@ -397,8 +386,9 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file && editor) {
-                  handleImageFile(file, editor);
+                const ed = editorRef.current;
+                if (file && ed) {
+                  void insertStemImage(file, ed, (m) => stemErrorReporterRef.current(m));
                 }
                 // Reset input
                 if (fileInputRef.current) {
@@ -418,112 +408,6 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
                 <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
               </svg>
             </button>
-            <div className="relative link-input-container">
-              <button
-                type="button"
-                onClick={() => {
-                  const previousUrl = editor.getAttributes('link').href;
-                  if (previousUrl) {
-                    // If link exists, remove it
-                    editor.chain().focus().extendMarkRange('link').unsetLink().run();
-                    setShowLinkInput(false);
-                    setLinkUrl('');
-                  } else {
-                    // If no link, show input
-                    setLinkUrl('');
-                    setShowLinkInput(true);
-                    // Focus input after state update
-                    setTimeout(() => linkInputRef.current?.focus(), 0);
-                  }
-                }}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  editor.isActive('link')
-                    ? 'bg-primary/15 text-primary'
-                    : 'text-base-content/50 hover:bg-base-200 hover:text-base-content/70'
-                }`}
-                title={editor.isActive('link') ? 'Bağlantıyı Kaldır' : 'Bağlantı Ekle'}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                </svg>
-              </button>
-              
-              {/* Link Input Popup */}
-              {showLinkInput && (
-                <div className="absolute top-full left-0 mt-2 p-3 bg-base-100 border-2 border-base-300/60 rounded-xl shadow-lg z-50 min-w-[300px]">
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={linkInputRef}
-                      type="text"
-                      value={linkUrl}
-                      onChange={(e) => setLinkUrl(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (linkUrl.trim()) {
-                            // Ensure URL has protocol
-                            let url = linkUrl.trim();
-                            if (!url.match(/^https?:\/\//)) {
-                              url = 'https://' + url;
-                            }
-                            editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-                            setShowLinkInput(false);
-                            setLinkUrl('');
-                            editor.commands.focus();
-                          }
-                        } else if (e.key === 'Escape') {
-                          setShowLinkInput(false);
-                          setLinkUrl('');
-                          editor.commands.focus();
-                        }
-                      }}
-                      placeholder="https://example.com veya yapıştırın"
-                      className="input input-sm input-bordered flex-1 rounded-lg text-sm"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (linkUrl.trim()) {
-                          // Ensure URL has protocol
-                          let url = linkUrl.trim();
-                          if (!url.match(/^https?:\/\//)) {
-                            url = 'https://' + url;
-                          }
-                          editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-                          setShowLinkInput(false);
-                          setLinkUrl('');
-                          editor.commands.focus();
-                        }
-                      }}
-                      className="btn btn-sm btn-primary rounded-lg px-3"
-                      title="Ekle (Enter)"
-                    >
-                      Ekle
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowLinkInput(false);
-                        setLinkUrl('');
-                        editor.commands.focus();
-                      }}
-                      className="btn btn-sm btn-ghost rounded-lg px-2"
-                      title="İptal (Esc)"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  </div>
-                  <p className="text-xs text-base-content/40 mt-2">
-                    Metni seçin, bağlantı butonuna tıklayın ve URL'yi girin/yapıştırın
-                  </p>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Editor Content */}
@@ -531,64 +415,6 @@ export function RichTextSettings({ settings, onChange }: RichTextSettingsProps) 
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="border-t border-base-300/30" />
-
-      {/* Response toggle */}
-      <div
-        className={`
-          flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer select-none
-          ${hasResponse ? 'border-primary/40 bg-primary/5' : 'border-base-300/40 bg-base-200/30'}
-        `}
-        onClick={() => handleResponseToggle(!hasResponse)}
-      >
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <p className="text-sm font-semibold text-base-content/80">Yanıt Alanı</p>
-            {hasResponse && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
-                Aktif
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-base-content/50">
-            {hasResponse
-              ? 'Katılımcılar bu içeriğe yanıt verebilir'
-              : 'Sadece bilgilendirme — yanıt alanı yok'}
-          </p>
-        </div>
-
-        <div className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-colors duration-200 ${hasResponse ? 'bg-primary' : 'bg-base-300'}`}>
-          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${hasResponse ? 'left-7' : 'left-1'}`} />
-        </div>
-      </div>
-
-      {/* Response settings (shown when hasResponse is true) */}
-      {hasResponse && (
-        <div className="space-y-4 pl-2 border-l-2 border-primary/20">
-          <div>
-            <label className="text-xs font-medium text-base-content/60 mb-1 block">Maksimum karakter</label>
-            <input
-              type="number"
-              className="input input-bordered input-sm w-full max-w-[180px] rounded-lg"
-              min={50}
-              max={MAX_RESPONSE_LENGTH}
-              value={responseMaxLength}
-              onChange={(e) => handleMaxLengthChange(Number(e.target.value))}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-base-content/60 mb-1 block">Placeholder</label>
-            <input
-              type="text"
-              className="input input-bordered input-sm w-full rounded-lg"
-              value={responsePlaceholder}
-              onChange={(e) => handlePlaceholderChange(e.target.value)}
-              placeholder="Cevabınızı yazın..."
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

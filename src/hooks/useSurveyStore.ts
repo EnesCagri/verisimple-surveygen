@@ -16,6 +16,14 @@ function loadFromLS(): Survey[] {
   }
 }
 
+function hasSurveysStorageKey(): boolean {
+  try {
+    return localStorage.getItem(LS_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 function saveToLS(surveys: Survey[]) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(surveys));
@@ -25,11 +33,35 @@ function saveToLS(surveys: Survey[]) {
 }
 
 /**
+ * Geliştirmede: `vs:surveys` hiç yazılmamışken (ilk çalıştırma veya storage temizlendi)
+ * bir demo anket eklenir. Kullanıcı tüm anketleri sildiğinde `[]` kalır, yeniden doldurulmaz.
+ */
+function getInitialSurveys(): Survey[] {
+  const loaded = loadFromLS();
+  if (loaded.length > 0) return loaded;
+  if (import.meta.env.DEV && !hasSurveysStorageKey()) {
+    const now = new Date().toISOString();
+    const demo = buildDemoData();
+    const seeded: Survey[] = [
+      {
+        id: generateId(),
+        ...demo,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    saveToLS(seeded);
+    return seeded;
+  }
+  return [];
+}
+
+/**
  * Hook for managing the collection of surveys (dashboard-level).
  * Persists to localStorage so drafts survive page navigations inside Razor.
  */
 export function useSurveyStore() {
-  const [surveys, setSurveys] = useState<Survey[]>(() => loadFromLS());
+  const [surveys, setSurveys] = useState<Survey[]>(() => getInitialSurveys());
 
   // Sync to localStorage whenever surveys change (skip initial mount double-write)
   const isFirstRender = useRef(true);

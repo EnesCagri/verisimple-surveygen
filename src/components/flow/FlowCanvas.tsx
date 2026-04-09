@@ -27,6 +27,7 @@ import {
   hasSavedNodePositions,
   normalizeCustomSequentialEdges,
 } from "../../utils/flowDagreLayout";
+import { questionListPlainText } from "../../utils/questionDisplayText";
 
 import type {
   Question,
@@ -169,7 +170,7 @@ function buildNodes(
       position: savedPos ?? defaultPos,
       data: {
         order: q.order,
-        text: q.text,
+        text: questionListPlainText(q),
         type: q.type,
         answers: Array.isArray(q.answers) ? q.answers : [],
         guid: q.guid,
@@ -214,7 +215,17 @@ function buildEdgeLabel(rule: ConditionalRule, questions: Question[]): string {
   const op = rule.operator ?? (rule.answer === "*" ? "any" : "equals");
 
   if (op === "any") return "Herhangi";
+  if (op === "choice_unanswered") return "Boş geçme";
   if (op === "equals") return rule.answer;
+  if (op === "equals_any") {
+    const vals =
+      rule.answerValues && rule.answerValues.length > 0
+        ? rule.answerValues
+        : rule.answer
+          ? [rule.answer]
+          : [];
+    return vals.length ? vals.join(" veya ") : "Şıklardan biri";
+  }
   if (
     op === "row_equals" &&
     src?.settings?.rows &&
@@ -333,7 +344,7 @@ function buildEdges(
       type: "smoothstep",
       animated: true,
       label,
-      labelStyle: { fontSize: 13, fontWeight: 700, fill: color },
+      labelStyle: { fontSize: 16, fontWeight: 700, fill: color },
       labelBgStyle: { fill: "white", fillOpacity: 0.9 },
       labelBgPadding: [8, 5] as [number, number],
       labelBgBorderRadius: 8,
@@ -936,6 +947,7 @@ function FlowCanvasInner({
       : undefined;
 
   const modalInitialAnswer = editingCondition?.answer;
+  const modalInitialAnswerValues = editingCondition?.answerValues;
   const modalInitialOperator = editingCondition?.operator;
   const modalInitialRowIndex = editingCondition?.rowIndex;
 
@@ -1119,6 +1131,7 @@ function FlowCanvasInner({
           conditions={conditions}
           excludeConditionId={editingCondition?.id}
           initialAnswer={modalInitialAnswer}
+          initialAnswerValues={modalInitialAnswerValues}
           initialAction={modalInitialAction}
           initialOperator={modalInitialOperator}
           initialRowIndex={modalInitialRowIndex}

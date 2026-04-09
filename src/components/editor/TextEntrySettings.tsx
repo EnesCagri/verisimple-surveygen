@@ -71,7 +71,7 @@ export function TextEntrySettings({ settings, onChange }: TextEntrySettingsProps
               disabled
               rows={3}
             />
-            <span className="absolute bottom-2 right-3 text-[10px] text-base-content/30">
+            <span className="absolute bottom-2 right-3 text-xs text-base-content/30">
               0 / {maxLength.toLocaleString('tr-TR')}
             </span>
           </div>

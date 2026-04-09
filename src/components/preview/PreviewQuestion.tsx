@@ -1,46 +1,21 @@
-import { useState, useEffect, useRef } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import TextAlign from '@tiptap/extension-text-align';
-import Placeholder from '@tiptap/extension-placeholder';
-import Image from '@tiptap/extension-image';
-import Link from '@tiptap/extension-link';
+import { useState, useCallback, useMemo } from 'react';
 import { DragDropProvider } from '@dnd-kit/react';
-import { useSortable } from '@dnd-kit/react/sortable';
+import { isSortable, useSortable } from '@dnd-kit/react/sortable';
+import {
+  choiceAnswerDisplayLabel,
+  choiceAnswerRowVisible,
+  choiceQuestionsHasAnyAnswerImage,
+  resolveChoiceAnswerImage,
+} from '../../utils/answerImages';
+import { useSortableRowIds } from '../../hooks/useSortableRowIds';
+import { isQuestionRequired } from '../../utils/questionRequired';
 import type { Question } from '../../types/survey';
 import { QuestionType } from '../../types/survey';
+import { QuestionStemHeading } from './QuestionStemHeading';
+import { shuffleDisplayOrder } from '../../utils/shuffleDisplayOrder';
 
-// Helper function to convert file to base64
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-// Helper function to handle image files
-async function handleImageFile(file: File, editor: any) {
-  if (!file.type.startsWith('image/')) {
-    alert('Lütfen bir görsel dosyası seçin.');
-    return;
-  }
-
-  // Check file size (max 5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    alert('Görsel boyutu 5MB\'dan küçük olmalıdır.');
-    return;
-  }
-
-  try {
-    const base64 = await fileToBase64(file);
-    editor.chain().focus().setImage({ src: base64 }).run();
-  } catch (error) {
-    console.error('Error loading image:', error);
-    alert('Görsel yüklenirken bir hata oluştu.');
-  }
+function orderMatchesCanonical(value: string[], canonical: string[]): boolean {
+  return value.length === canonical.length && value.every((v, i) => v === canonical[i]);
 }
 
 interface PreviewQuestionProps {
@@ -119,14 +94,6 @@ export function PreviewQuestion({
           onChange={(items) => onSortableChange?.(question.guid, items)}
         />
       );
-    case QuestionType.RichText:
-      return (
-        <RichTextPreview
-          question={question}
-          value={textValue}
-          onChange={(text) => onTextChange?.(question.guid, text)}
-        />
-      );
     default:
       return (
         <ChoicePreview
@@ -157,16 +124,37 @@ function ChoicePreview({
   const isMultiple = question.type === QuestionType.MultipleChoice;
 
   const answerImages = question.settings?.answerImages ?? {};
-  const hasAnyImage = Object.keys(answerImages).length > 0;
+  const hasAnyImage = choiceQuestionsHasAnyAnswerImage(answerImages);
+  const randomize = question.settings?.randomizeAnswerOrder === true;
+
+  const visibleKey = useMemo(
+    () =>
+      question.answers
+        .map((a, i) => (choiceAnswerRowVisible(a, i, answerImages) ? `${i}\u0001${a}` : ''))
+        .filter(Boolean)
+        .join('\u0002'),
+    [question.answers, answerImages],
+  );
+
+  const displayRows = useMemo(() => {
+    const rows: { origIndex: number; answer: string }[] = [];
+    question.answers.forEach((answer, origIndex) => {
+      if (!choiceAnswerRowVisible(answer, origIndex, answerImages)) return;
+      rows.push({ origIndex, answer });
+    });
+    if (!randomize) return rows;
+    return shuffleDisplayOrder([...rows]);
+  }, [question.guid, randomize, visibleKey]);
 
   return (
     <div className="animate-[fadeSlideIn_0.4s_ease-out]">
       <div className="flex items-start gap-3 mb-2">
-        <h2 className="text-2xl font-semibold text-base-content/85 leading-snug flex-1">
-          {question.text || 'Soru metni girilmemiş'}
-        </h2>
-        {question.required && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-error/10 text-error border border-error/20 shrink-0">
+        <QuestionStemHeading
+          question={question}
+          plainClassName="text-2xl font-semibold text-base-content/85 leading-snug flex-1"
+        />
+        {isQuestionRequired(question) && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 shrink-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v4" />
@@ -190,12 +178,13 @@ function ChoicePreview({
 
       {/* Grid layout for image answers, list layout for text-only */}
       <div className={hasAnyImage ? 'grid grid-cols-2 gap-3' : 'space-y-3'}>
-        {question.answers.filter(Boolean).map((answer, index) => {
+        {displayRows.map(({ answer, origIndex }, displayIndex) => {
+          const label = choiceAnswerDisplayLabel(answer, origIndex);
           const isSelected = selectedAnswers.includes(answer);
-          const answerImage = answerImages[answer];
+          const answerImage = resolveChoiceAnswerImage(answerImages, answer, origIndex);
           return (
             <button
-              key={index}
+              key={origIndex}
               className={`
                 w-full text-left rounded-2xl border-2 transition-all duration-200 ease-out group
                 ${hasAnyImage ? 'p-3 flex flex-col' : 'px-5 py-4 flex items-center gap-4'}
@@ -245,10 +234,10 @@ function ChoicePreview({
                     ${isSelected ? 'bg-primary text-primary-content border-primary shadow-sm' : 'bg-base-200/80 text-base-content/45 border-base-300/60'}
                   `}
                   >
-                    {String.fromCharCode(65 + index)}
+                    {String.fromCharCode(65 + displayIndex)}
                   </span>
                   <span className={`text-base transition-colors duration-200 ${isSelected ? 'text-base-content/90 font-medium' : 'text-base-content/60'}`}>
-                    {answer}
+                    {label}
                   </span>
                 </span>
               </div>
@@ -278,15 +267,17 @@ function TextEntryPreview({
   const charCount = value.length;
   const isNearLimit = charCount > maxLength * 0.9;
   const isOverLimit = charCount > maxLength;
+  const infoOnly = question.settings?.richInformationOnly === true;
 
   return (
     <div className="animate-[fadeSlideIn_0.4s_ease-out]">
       <div className="flex items-start gap-3 mb-2">
-        <h2 className="text-2xl font-semibold text-base-content/85 leading-snug flex-1">
-          {question.text || 'Soru metni girilmemiş'}
-        </h2>
-        {question.required && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-error/10 text-error border border-error/20 shrink-0">
+        <QuestionStemHeading
+          question={question}
+          plainClassName="text-2xl font-semibold text-base-content/85 leading-snug flex-1"
+        />
+        {isQuestionRequired(question) && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 shrink-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v4" />
@@ -304,11 +295,15 @@ function TextEntryPreview({
         </div>
       )}
 
-      <p className="text-sm text-base-content/35 mb-8">Cevabınızı aşağıya yazın</p>
+      {infoOnly ? (
+        <p className="text-sm text-base-content/35 mb-4">Bilgilendirme — devam etmek için İleri&apos;ye basın.</p>
+      ) : (
+        <>
+          <p className="text-sm text-base-content/35 mb-8">Cevabınızı aşağıya yazın</p>
 
-      <div className="relative">
-        <textarea
-          className={`
+          <div className="relative">
+            <textarea
+              className={`
             textarea w-full min-h-36 resize-y rounded-2xl border-2 bg-base-100 px-5 py-4
             text-base leading-relaxed transition-all duration-200
             focus:outline-none
@@ -317,23 +312,25 @@ function TextEntryPreview({
               : 'border-base-300/50 focus:border-primary/40'
             }
           `}
-          placeholder={placeholder}
-          value={value}
-          maxLength={maxLength + 50}
-          onChange={(e) => onChange(e.target.value)}
-          rows={5}
-        />
-        <div className="flex items-center justify-end mt-2 px-1">
-          <span
-            className={`
+              placeholder={placeholder}
+              value={value}
+              maxLength={maxLength + 50}
+              onChange={(e) => onChange(e.target.value)}
+              rows={5}
+            />
+            <div className="flex items-center justify-end mt-2 px-1">
+              <span
+                className={`
               text-xs font-medium transition-colors duration-200
               ${isOverLimit ? 'text-error' : isNearLimit ? 'text-warning' : 'text-base-content/30'}
             `}
-          >
-            {charCount.toLocaleString('tr-TR')} / {maxLength.toLocaleString('tr-TR')}
-          </span>
-        </div>
-      </div>
+              >
+                {charCount.toLocaleString('tr-TR')} / {maxLength.toLocaleString('tr-TR')}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -362,11 +359,12 @@ function RatingPreview({
   return (
     <div className="animate-[fadeSlideIn_0.4s_ease-out]">
       <div className="flex items-start gap-3 mb-2">
-        <h2 className="text-2xl font-semibold text-base-content/85 leading-snug flex-1">
-          {question.text || 'Soru metni girilmemiş'}
-        </h2>
-        {question.required && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-error/10 text-error border border-error/20 shrink-0">
+        <QuestionStemHeading
+          question={question}
+          plainClassName="text-2xl font-semibold text-base-content/85 leading-snug flex-1"
+        />
+        {isQuestionRequired(question) && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 shrink-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v4" />
@@ -446,473 +444,6 @@ function RatingPreview({
   );
 }
 
-/* ═══════════════════════════════════════════
-   Rich Text Preview
-   ═══════════════════════════════════════════ */
-
-/* ═══════════════════════════════════════════
-   Rich Text Response Area Component
-   ═══════════════════════════════════════════ */
-
-function RichTextResponseArea({
-  value,
-  onChange,
-  placeholder,
-  maxLength,
-}: {
-  value: string;
-  onChange: (text: string) => void;
-  placeholder: string;
-  maxLength: number;
-}) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [showLinkInput, setShowLinkInput] = useState(false);
-  const [linkUrl, setLinkUrl] = useState('');
-  const linkInputRef = useRef<HTMLInputElement>(null);
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
-      }),
-      Underline,
-      Image.configure({
-        inline: true,
-        allowBase64: true,
-      }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          target: '_blank',
-          rel: 'noopener noreferrer',
-        },
-      }),
-      TextAlign.configure({
-        types: ['heading', 'paragraph'],
-      }),
-      Placeholder.configure({
-        placeholder,
-      }),
-    ],
-    content: value || '',
-    onUpdate: ({ editor }) => {
-      const html = editor.getHTML();
-      const text = editor.getText();
-      // Check character limit (use text length, not HTML)
-      if (text.length <= maxLength) {
-        onChange(html);
-      } else {
-        // Revert to previous content if over limit
-        editor.commands.setContent(value || '');
-      }
-    },
-    editorProps: {
-      attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[150px] max-h-[300px] overflow-y-auto px-4 py-3 text-sm leading-relaxed',
-      },
-      handleDrop: (_view, event, _slice, moved) => {
-        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]) {
-          const file = event.dataTransfer.files[0];
-          if (file.type.startsWith('image/')) {
-            event.preventDefault();
-            handleImageFile(file, editor);
-            return true;
-          }
-        }
-        return false;
-      },
-      handlePaste: (_view, event, _slice) => {
-        const items = event.clipboardData?.items;
-        if (items) {
-          for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            if (item.type.startsWith('image/')) {
-              event.preventDefault();
-              const file = item.getAsFile();
-              if (file) {
-                handleImageFile(file, editor);
-                return true;
-              }
-            }
-          }
-        }
-        return false;
-      },
-    },
-  });
-
-  // Update editor when value changes externally
-  useEffect(() => {
-    if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value || '');
-    }
-  }, [value, editor]);
-
-  // Add drag & drop handlers to editor container
-  useEffect(() => {
-    if (!editor) return;
-
-    const editorElement = editor.view.dom;
-    
-    const handleDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(true);
-    };
-
-    const handleDragLeave = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-    };
-
-    const handleDrop = async (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-
-      const file = e.dataTransfer?.files[0];
-      if (file && file.type.startsWith('image/')) {
-        await handleImageFile(file, editor);
-      }
-    };
-
-    editorElement.addEventListener('dragover', handleDragOver);
-    editorElement.addEventListener('dragleave', handleDragLeave);
-    editorElement.addEventListener('drop', handleDrop);
-
-    return () => {
-      editorElement.removeEventListener('dragover', handleDragOver);
-      editorElement.removeEventListener('dragleave', handleDragLeave);
-      editorElement.removeEventListener('drop', handleDrop);
-    };
-  }, [editor]);
-
-  // Close link input when clicking outside
-  useEffect(() => {
-    if (!showLinkInput) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.link-input-container')) {
-        setShowLinkInput(false);
-        setLinkUrl('');
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLinkInput]);
-
-  if (!editor) {
-    return <div className="h-48 bg-base-200/30 rounded-xl animate-pulse" />;
-  }
-
-  const textLength = editor.getText().length;
-  const isNearLimit = textLength > maxLength * 0.9;
-  const isOverLimit = textLength > maxLength;
-
-  return (
-    <div>
-      <p className="text-sm text-base-content/50 mb-3">Yanıtınızı aşağıya yazın</p>
-      
-      {/* Simple Toolbar */}
-      <div className="flex items-center gap-1 px-3 py-2 border-2 border-b-0 border-base-300/60 bg-base-200/40 rounded-t-xl flex-wrap">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file && editor) {
-              handleImageFile(file, editor);
-            }
-            // Reset input
-            if (fileInputRef.current) {
-              fileInputRef.current.value = '';
-            }
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-1.5 rounded-lg transition-colors ${
-            editor.isActive('bold')
-              ? 'bg-primary/15 text-primary'
-              : 'text-base-content/50 hover:bg-base-200 hover:text-base-content/70'
-          }`}
-          title="Kalın"
-        >
-          <span className="text-xs font-bold w-5 h-5 flex items-center justify-center">B</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-1.5 rounded-lg transition-colors ${
-            editor.isActive('italic')
-              ? 'bg-primary/15 text-primary'
-              : 'text-base-content/50 hover:bg-base-200 hover:text-base-content/70'
-          }`}
-          title="İtalik"
-        >
-          <span className="text-xs italic w-5 h-5 flex items-center justify-center">I</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          className={`p-1.5 rounded-lg transition-colors ${
-            editor.isActive('underline')
-              ? 'bg-primary/15 text-primary'
-              : 'text-base-content/50 hover:bg-base-200 hover:text-base-content/70'
-          }`}
-          title="Altı Çizili"
-        >
-          <span className="text-xs underline w-5 h-5 flex items-center justify-center">U</span>
-        </button>
-        <div className="w-px h-5 bg-base-300/60 mx-1" />
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`p-1.5 rounded-lg transition-colors ${
-            editor.isActive('bulletList')
-              ? 'bg-primary/15 text-primary'
-              : 'text-base-content/50 hover:bg-base-200 hover:text-base-content/70'
-          }`}
-          title="Madde İşareti"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
-            <circle cx="4" cy="6" r="1" fill="currentColor" /><circle cx="4" cy="12" r="1" fill="currentColor" /><circle cx="4" cy="18" r="1" fill="currentColor" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={`p-1.5 rounded-lg transition-colors ${
-            editor.isActive('orderedList')
-              ? 'bg-primary/15 text-primary'
-              : 'text-base-content/50 hover:bg-base-200 hover:text-base-content/70'
-          }`}
-          title="Numaralı Liste"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="10" y1="6" x2="21" y2="6" /><line x1="10" y1="12" x2="21" y2="12" /><line x1="10" y1="18" x2="21" y2="18" />
-            <path d="M4 6h1v4" /><path d="M4 10h2" /><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
-          </svg>
-        </button>
-        <div className="w-px h-5 bg-base-300/60 mx-1" />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="p-1.5 rounded-lg transition-colors text-base-content/50 hover:bg-base-200 hover:text-base-content/70"
-          title="Görsel Ekle (Dosya seç, sürükle-bırak veya yapıştır)"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-          </svg>
-        </button>
-        <div className="relative link-input-container">
-          <button
-            type="button"
-            onClick={() => {
-              const previousUrl = editor.getAttributes('link').href;
-              if (previousUrl) {
-                // If link exists, remove it
-                editor.chain().focus().extendMarkRange('link').unsetLink().run();
-                setShowLinkInput(false);
-                setLinkUrl('');
-              } else {
-                // If no link, show input
-                setLinkUrl('');
-                setShowLinkInput(true);
-                // Focus input after state update
-                setTimeout(() => linkInputRef.current?.focus(), 0);
-              }
-            }}
-            className={`p-1.5 rounded-lg transition-colors ${
-              editor.isActive('link')
-                ? 'bg-primary/15 text-primary'
-                : 'text-base-content/50 hover:bg-base-200 hover:text-base-content/70'
-            }`}
-            title={editor.isActive('link') ? 'Bağlantıyı Kaldır' : 'Bağlantı Ekle'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-            </svg>
-          </button>
-          
-          {/* Link Input Popup */}
-          {showLinkInput && (
-            <div className="absolute top-full left-0 mt-2 p-3 bg-base-100 border-2 border-base-300/60 rounded-xl shadow-lg z-50 min-w-[300px]">
-              <div className="flex items-center gap-2">
-                <input
-                  ref={linkInputRef}
-                  type="text"
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (linkUrl.trim()) {
-                        // Ensure URL has protocol
-                        let url = linkUrl.trim();
-                        if (!url.match(/^https?:\/\//)) {
-                          url = 'https://' + url;
-                        }
-                        editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-                        setShowLinkInput(false);
-                        setLinkUrl('');
-                        editor.commands.focus();
-                      }
-                    } else if (e.key === 'Escape') {
-                      setShowLinkInput(false);
-                      setLinkUrl('');
-                      editor.commands.focus();
-                    }
-                  }}
-                  placeholder="https://example.com veya yapıştırın"
-                  className="input input-sm input-bordered flex-1 rounded-lg text-sm"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (linkUrl.trim()) {
-                      // Ensure URL has protocol
-                      let url = linkUrl.trim();
-                      if (!url.match(/^https?:\/\//)) {
-                        url = 'https://' + url;
-                      }
-                      editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-                      setShowLinkInput(false);
-                      setLinkUrl('');
-                      editor.commands.focus();
-                    }
-                  }}
-                  className="btn btn-sm btn-primary rounded-lg px-3"
-                  title="Ekle (Enter)"
-                >
-                  Ekle
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowLinkInput(false);
-                    setLinkUrl('');
-                    editor.commands.focus();
-                  }}
-                  className="btn btn-sm btn-ghost rounded-lg px-2"
-                  title="İptal (Esc)"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-              <p className="text-xs text-base-content/40 mt-2">
-                Metni seçin, bağlantı butonuna tıklayın ve URL'yi girin/yapıştırın
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Editor */}
-      <div className={`rounded-b-xl border-2 bg-base-100 overflow-hidden transition-all duration-200 ${
-        isOverLimit
-          ? 'border-error/60'
-          : isDragging
-          ? 'border-primary/60 border-dashed bg-primary/5'
-          : 'border-base-300/60'
-      }`}>
-        <EditorContent editor={editor} />
-      </div>
-
-      {/* Character count */}
-      <div className="flex items-center justify-end mt-2 px-1">
-        <span
-          className={`
-            text-xs font-medium transition-colors duration-200
-            ${isOverLimit ? 'text-error' : isNearLimit ? 'text-warning' : 'text-base-content/30'}
-          `}
-        >
-          {textLength.toLocaleString('tr-TR')} / {maxLength.toLocaleString('tr-TR')}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function RichTextPreview({
-  question,
-  value,
-  onChange,
-}: {
-  question: Question;
-  value: string;
-  onChange: (text: string) => void;
-}) {
-  const hasResponse = question.settings?.hasResponse ?? false;
-  const maxLength = question.settings?.responseMaxLength ?? 2000;
-  const placeholder = question.settings?.responsePlaceholder || 'Cevabınızı yazın...';
-  const richContent = question.settings?.richContent ?? '';
-
-  return (
-    <div className="animate-[fadeSlideIn_0.4s_ease-out]">
-      {/* Question title (if any) */}
-      {question.text && (
-        <div className="flex items-start gap-3 mb-4">
-          <h2 className="text-2xl font-semibold text-base-content/85 leading-snug flex-1">
-            {question.text}
-          </h2>
-          {question.required && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-error/10 text-error border border-error/20 shrink-0">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v4" />
-                <path d="M12 16h.01" />
-              </svg>
-              Zorunlu
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Rich text content */}
-      {richContent && (
-        <div
-          className="prose prose-sm max-w-none text-base-content/80 mb-6 p-5 rounded-2xl bg-base-200/30 border border-base-300/30"
-          dangerouslySetInnerHTML={{ __html: richContent }}
-        />
-      )}
-
-      {/* Response area (optional) */}
-      {hasResponse && (
-        <RichTextResponseArea
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          maxLength={maxLength}
-        />
-      )}
-
-      {/* No response area message */}
-      {!hasResponse && !richContent && (
-        <div className="text-center py-8 text-base-content/30">
-          <p className="text-sm">Bilgilendirme içeriği henüz eklenmemiş</p>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════
    Sortable Preview (Drag & Drop ranking)
@@ -921,23 +452,35 @@ function RichTextPreview({
 function SortableItem({
   item,
   index,
-  rank,
+  sortableId,
+  questionGuid,
 }: {
   item: string;
   index: number;
-  rank: number;
+  sortableId: string;
+  questionGuid: string;
 }) {
-  const { ref, isDragging } = useSortable({
-    id: item,
+  const { ref, handleRef, isDragging, sortable } = useSortable({
+    id: sortableId,
     index,
+    group: questionGuid,
   });
+  const rank = sortable.index + 1;
+
+  const setNodeRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      ref(el);
+      handleRef(el);
+    },
+    [ref, handleRef],
+  );
 
   return (
     <div
-      ref={ref}
+      ref={setNodeRef}
       className={`
-        flex items-center gap-3 px-5 py-4 rounded-2xl border-2 bg-base-100 cursor-grab active:cursor-grabbing
-        transition-all duration-200 select-none group
+        flex touch-none items-center gap-3 px-5 py-4 rounded-2xl border-2 bg-base-100 cursor-grab active:cursor-grabbing
+        transition-[border-color,box-shadow,opacity,transform,background-color] duration-200 select-none group
         ${isDragging
           ? 'border-primary/50 bg-primary/4 shadow-lg scale-[1.02] opacity-80 z-50'
           : 'border-base-300/50 hover:border-primary/30 hover:shadow-sm'
@@ -947,7 +490,7 @@ function SortableItem({
       {/* Rank number */}
       <span
         className={`
-          inline-flex items-center justify-center w-8 h-8 rounded-xl text-sm font-bold shrink-0 transition-colors duration-200
+          inline-flex items-center justify-center w-8 h-8 rounded-xl text-sm font-bold tabular-nums shrink-0 transition-none
           ${isDragging ? 'bg-primary text-primary-content' : 'bg-primary/10 text-primary/70'}
         `}
       >
@@ -1004,35 +547,51 @@ function SortablePreview({
   value: string[];
   onChange: (items: string[]) => void;
 }) {
-  const items = value.length > 0 ? value : question.answers.filter(Boolean);
+  const canonical = useMemo(() => question.answers.filter(Boolean), [question.answers]);
+  const rawValue = value.length > 0 ? value : canonical;
+  const randomize = question.settings?.randomizeAnswerOrder === true;
+  const sortableOrderKey = orderMatchesCanonical(rawValue, canonical) ? 'canonical' : rawValue.join('\u0001');
+  const items = useMemo(() => {
+    if (!randomize) return rawValue;
+    if (!orderMatchesCanonical(rawValue, canonical)) return rawValue;
+    return shuffleDisplayOrder([...canonical]);
+  }, [question.guid, randomize, canonical.join('\u0001'), sortableOrderKey]);
+
+  const { rowIds, reorderRowIds } = useSortableRowIds(question.guid, items);
 
   const handleDragEnd = (event: Parameters<NonNullable<React.ComponentProps<typeof DragDropProvider>['onDragEnd']>>[0]) => {
-    const source = event.operation.source;
-    const target = event.operation.target;
-    if (!source || !target) return;
+    if (event.canceled || event.operation.canceled) return;
 
-    const sourceId = String(source.id);
-    const targetId = String(target.id);
-    if (sourceId === targetId) return;
+    const { source } = event.operation;
+    if (!source) return;
 
-    const oldIndex = items.indexOf(sourceId);
-    const newIndex = items.indexOf(targetId);
-    if (oldIndex === -1 || newIndex === -1) return;
+    let oldIndex = -1;
+    let newIndex = -1;
+
+    if (isSortable(source) && typeof source.initialIndex === 'number' && typeof source.index === 'number') {
+      oldIndex = source.initialIndex;
+      newIndex = source.index;
+    }
+
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+    if (oldIndex >= items.length || newIndex >= items.length) return;
 
     const reordered = [...items];
     const [moved] = reordered.splice(oldIndex, 1);
     reordered.splice(newIndex, 0, moved);
+    reorderRowIds(oldIndex, newIndex);
     onChange(reordered);
   };
 
   return (
     <div className="animate-[fadeSlideIn_0.4s_ease-out]">
       <div className="flex items-start gap-3 mb-2">
-        <h2 className="text-2xl font-semibold text-base-content/85 leading-snug flex-1">
-          {question.text || 'Soru metni girilmemiş'}
-        </h2>
-        {question.required && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-error/10 text-error border border-error/20 shrink-0">
+        <QuestionStemHeading
+          question={question}
+          plainClassName="text-2xl font-semibold text-base-content/85 leading-snug flex-1"
+        />
+        {isQuestionRequired(question) && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 shrink-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v4" />
@@ -1056,20 +615,21 @@ function SortablePreview({
 
       {items.length === 0 ? (
         <p className="text-center py-8 text-base-content/30 text-sm">Sıralama öğesi eklenmemiş</p>
-      ) : (
+      ) : rowIds.length === items.length ? (
         <DragDropProvider onDragEnd={handleDragEnd}>
           <div className="flex flex-col gap-2.5">
             {items.map((item, index) => (
               <SortableItem
-                key={item}
+                key={rowIds[index]}
+                sortableId={rowIds[index]}
+                questionGuid={question.guid}
                 item={item}
                 index={index}
-                rank={index + 1}
               />
             ))}
           </div>
         </DragDropProvider>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -1097,11 +657,12 @@ function MatrixLikertPreview({
   const questionHeader = (
     <>
       <div className="flex items-start gap-3 mb-2">
-        <h2 className={`font-semibold text-base-content/85 leading-snug flex-1 ${isMobile ? 'text-lg' : 'text-2xl'}`}>
-          {question.text || 'Soru metni girilmemiş'}
-        </h2>
-        {question.required && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-error/10 text-error border border-error/20 shrink-0">
+        <QuestionStemHeading
+          question={question}
+          plainClassName={`font-semibold text-base-content/85 leading-snug flex-1 ${isMobile ? 'text-lg' : 'text-2xl'}`}
+        />
+        {isQuestionRequired(question) && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 shrink-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v4" />
@@ -1125,9 +686,10 @@ function MatrixLikertPreview({
   if (rows.length === 0 || columns.length === 0) {
     return (
       <div className="animate-[fadeSlideIn_0.4s_ease-out]">
-        <h2 className="text-2xl font-semibold text-base-content/85 mb-2 leading-snug">
-          {question.text || 'Soru metni girilmemiş'}
-        </h2>
+        <QuestionStemHeading
+          question={question}
+          plainClassName="text-2xl font-semibold text-base-content/85 mb-2 leading-snug"
+        />
         <p className="text-sm text-base-content/40 mt-6">
           Bu soru henüz yapılandırılmamış (satır/sütun eksik).
         </p>

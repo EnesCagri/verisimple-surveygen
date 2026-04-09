@@ -14,12 +14,6 @@ const defaultSettings: Partial<Record<QuestionType, QuestionSettings>> = {
     columns: ['Kesinlikle Katılmıyorum', 'Katılmıyorum', 'Kararsızım', 'Katılıyorum', 'Kesinlikle Katılıyorum'],
     matrixType: 'single',
   },
-  [QuestionType.RichText]: {
-    richContent: '',
-    hasResponse: false,
-    responseMaxLength: 2000,
-    responsePlaceholder: 'Cevabınızı yazın...',
-  },
   [QuestionType.Sortable]: {},
 };
 
@@ -31,7 +25,6 @@ const defaultAnswers: Partial<Record<QuestionType, string[]>> = {
   [QuestionType.Rating]: [],        // rating has no predefined answer options
   [QuestionType.MatrixLikert]: [],   // matrix answers are in rows × columns
   [QuestionType.Sortable]: [''],     // sortable items that the user will rank
-  [QuestionType.RichText]: [],       // no predefined answers
 };
 
 /**

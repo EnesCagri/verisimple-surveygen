@@ -10,7 +10,6 @@ export const questionTypeLabels: Record<QuestionType, string> = {
   [QuestionType.Rating]: 'Derecelendirme',
   [QuestionType.MatrixLikert]: 'Matrix Likert',
   [QuestionType.Sortable]: 'Sıralama',
-  [QuestionType.RichText]: 'Zengin Metin',
 };
 
 /**
@@ -24,6 +23,5 @@ export const questionTypeDescriptions: Record<QuestionType, string> = {
   [QuestionType.Rating]: 'Yıldız veya puan bazlı derecelendirme',
   [QuestionType.MatrixLikert]: 'Satır-sütun tabanlı ölçek sorusu',
   [QuestionType.Sortable]: 'Katılımcı seçenekleri sürükleyerek sıralar',
-  [QuestionType.RichText]: 'Biçimlendirilmiş içerik ve opsiyonel yanıt alanı',
 };
 

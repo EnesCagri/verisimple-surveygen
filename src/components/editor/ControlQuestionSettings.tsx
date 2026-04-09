@@ -1,5 +1,6 @@
 import type { Question, QuestionSettings } from '../../types/survey';
 import { QuestionType } from '../../types/survey';
+import { supportsControlQuestionType } from '../../utils/controlQuestion';
 
 interface ControlQuestionSettingsProps {
   question: Question;
@@ -10,6 +11,7 @@ interface ControlQuestionSettingsProps {
 export function ControlQuestionSettings({ question, settings, onChange }: ControlQuestionSettingsProps) {
   const isControlQuestion = settings.isControlQuestion ?? false;
   const correctAnswer = settings.correctAnswer ?? [];
+  const typeOk = supportsControlQuestionType(question.type);
 
   const handleToggle = (enabled: boolean) => {
     if (enabled) {
@@ -43,6 +45,34 @@ export function ControlQuestionSettings({ question, settings, onChange }: Contro
     }
   };
 
+  if (!typeOk) {
+    if (!isControlQuestion) {
+      return (
+        <div className="rounded-xl border border-base-300/50 bg-base-200/25 px-4 py-3">
+          <p className="text-sm font-medium text-base-content/55">Kontrol sorusu</p>
+          <p className="mt-1 text-xs text-base-content/40 leading-relaxed">
+            Bu soru tipi kontrol sorusu olarak desteklenmiyor. Yalnızca tek seçim, çoklu seçim ve derecelendirme soruları kullanılabilir.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-3 rounded-xl border-2 border-warning/40 bg-warning/10 p-4">
+        <p className="text-sm font-semibold text-base-content/80">Kontrol sorusu — desteklenmeyen tip</p>
+        <p className="text-xs text-base-content/50 leading-relaxed">
+          Bu soru tipinde doğru cevap tanımlanamaz. Kontrol sorusunu kapatın veya soru tipini tek seçim, çoklu seçim veya derecelendirme yapın.
+        </p>
+        <button
+          type="button"
+          onClick={() => handleToggle(false)}
+          className="btn btn-warning btn-sm rounded-lg"
+        >
+          Kontrol sorusunu kapat
+        </button>
+      </div>
+    );
+  }
+
   if (!isControlQuestion) {
     return (
       <div className="space-y-3">
@@ -75,7 +105,7 @@ export function ControlQuestionSettings({ question, settings, onChange }: Contro
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <p className="text-sm font-semibold text-base-content/80">Kontrol Sorusu</p>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
             Aktif
           </span>
         </div>
@@ -162,11 +192,7 @@ export function ControlQuestionSettings({ question, settings, onChange }: Contro
               );
             })}
           </div>
-        ) : (
-          <p className="text-xs text-base-content/40">
-            Bu soru tipi için kontrol sorusu özelliği henüz desteklenmiyor.
-          </p>
-        )}
+        ) : null}
       </div>
     </div>
   );

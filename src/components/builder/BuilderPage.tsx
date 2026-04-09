@@ -208,7 +208,11 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
       />
     ) : (
       <div className="h-full overflow-y-auto p-8">
-        <EditorPanel question={selectedQuestion} onUpdate={updateQuestion} />
+        <EditorPanel
+          question={selectedQuestion}
+          onUpdate={updateQuestion}
+          onDeleteQuestion={deleteQuestion}
+        />
       </div>
     );
 

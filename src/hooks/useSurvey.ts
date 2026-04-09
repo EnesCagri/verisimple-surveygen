@@ -3,6 +3,7 @@ import type { Question, ConditionalRule, ConditionInput, NodePositions, Sequenti
 import { findConflictingCondition } from '../utils/conditionDuplicate';
 import type { SurveyPayload } from '../bridge/types';
 import { createQuestion } from '../utils/question';
+import { normalizeSurveyQuestion } from '../utils/normalizeSurveyQuestion';
 import { generateId } from '../utils/id';
 import { normalizeSequentialEdges } from '../utils/flowDagreLayout';
 
@@ -18,7 +19,9 @@ export function useSurvey(
   initialSequentialEdges?: SequentialEdges,
 ) {
   const [title, setTitle] = useState(initialTitle);
-  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
+  const [questions, setQuestions] = useState<Question[]>(() =>
+    initialQuestions.map(normalizeSurveyQuestion),
+  );
   const [conditions, setConditions] = useState<ConditionalRule[]>(initialConditions);
   const [nodePositions, setNodePositions] = useState<NodePositions | undefined>(initialNodePositions);
   const [sequentialEdges, setSequentialEdges] = useState<SequentialEdges | undefined>(() =>
@@ -133,17 +136,18 @@ export function useSurvey(
   const addCondition = useCallback((sourceQuestionId: string, input: ConditionInput) => {
     setConditions((prev) => {
       if (findConflictingCondition(prev, sourceQuestionId, input)) return prev;
-      return [
-        ...prev,
-        {
-          id: generateId(),
-          sourceQuestionId,
-          answer: input.answer,
-          action: input.action,
-          operator: input.operator,
-          rowIndex: input.rowIndex,
-        },
-      ];
+      const row: ConditionalRule = {
+        id: generateId(),
+        sourceQuestionId,
+        answer: input.answer,
+        action: input.action,
+        operator: input.operator,
+        rowIndex: input.rowIndex,
+      };
+      if (input.answerValues && input.answerValues.length > 0) {
+        row.answerValues = input.answerValues;
+      }
+      return [...prev, row];
     });
   }, []);
 
@@ -152,17 +156,21 @@ export function useSurvey(
       const self = prev.find((c) => c.id === conditionId);
       if (!self) return prev;
       if (findConflictingCondition(prev, self.sourceQuestionId, input, conditionId)) return prev;
-      return prev.map((c) =>
-        c.id === conditionId
-          ? {
-              ...c,
-              answer: input.answer,
-              action: input.action,
-              operator: input.operator,
-              rowIndex: input.rowIndex,
-            }
-          : c,
-      );
+      return prev.map((c) => {
+        if (c.id !== conditionId) return c;
+        const { answerValues: _drop, ...rest } = c;
+        const next: ConditionalRule = {
+          ...rest,
+          answer: input.answer,
+          action: input.action,
+          operator: input.operator,
+          rowIndex: input.rowIndex,
+        };
+        if (input.answerValues && input.answerValues.length > 0) {
+          next.answerValues = input.answerValues;
+        }
+        return next;
+      });
     });
   }, []);
 
@@ -222,6 +230,9 @@ export function useSurvey(
         if (c.rowIndex !== undefined) {
           mapped.rowIndex = c.rowIndex;
         }
+        if (c.answerValues && c.answerValues.length > 0) {
+          mapped.answerValues = c.answerValues;
+        }
         return mapped;
       });
     }
@@ -264,6 +275,7 @@ export function useSurvey(
               : { jumpTo: c.action.targetQuestionId },
           ...(c.operator && c.operator !== 'equals' && c.operator !== 'any' ? { operator: c.operator } : {}),
           ...(c.rowIndex !== undefined ? { rowIndex: c.rowIndex } : {}),
+          ...(c.answerValues && c.answerValues.length > 0 ? { answerValues: c.answerValues } : {}),
         }));
       }
 

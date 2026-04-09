@@ -36,7 +36,7 @@ function LiveFlowEndNodeComponent({ data }: NodeProps) {
         <path d="m9 9 6 6" />
         <path d="m15 9-6 6" />
       </svg>
-      <span className={`text-[12px] font-bold ${isActive ? 'text-error' : 'text-error/40'}`}>
+      <span className={`text-sm font-bold ${isActive ? 'text-error' : 'text-error/40'}`}>
         Anketi Bitir
       </span>
     </div>

@@ -113,7 +113,7 @@ export function MatrixLikertSettings({ settings, onChange }: MatrixLikertSetting
           <div className="space-y-1.5">
             {rows.map((row, i) => (
               <div key={i} className="group flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-primary/8 text-primary text-[10px] font-bold shrink-0">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-primary/8 text-primary text-xs font-bold shrink-0">
                   {i + 1}
                 </span>
                 <input
@@ -161,7 +161,7 @@ export function MatrixLikertSettings({ settings, onChange }: MatrixLikertSetting
           <div className="space-y-1.5">
             {columns.map((col, i) => (
               <div key={i} className="group flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-secondary/10 text-secondary text-[10px] font-bold shrink-0">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-secondary/10 text-secondary text-xs font-bold shrink-0">
                   {String.fromCharCode(65 + i)}
                 </span>
                 <input

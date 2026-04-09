@@ -13,8 +13,8 @@
   --color-base-200: oklch(96.8% 0.008 286);
   --color-base-300: oklch(92.5% 0.012 286);
   --color-base-content: oklch(25% 0.015 285);
-  --color-primary: oklch(64% 0.2 284);
-  --color-primary-content: oklch(100% 0 0);
+  --color-primary: #9381ff;
+  --color-primary-content: #ffffff;
   --color-secondary: oklch(87% 0.08 286);
   --color-secondary-content: oklch(30% 0.02 285);
   --color-accent: oklch(61% 0.18 145);
@@ -25,9 +25,15 @@
   --color-success: oklch(73% 0.17 151);
   --color-warning: oklch(83% 0.16 85);
   --color-error: oklch(65% 0.22 28);
-  --rounded-box: 1.05rem;
-  --rounded-btn: 0.9rem;
-  --rounded-badge: 1rem;
+  --rounded-box: 1.25rem;
+  /* Figma: tam hap (pill) butonlar */
+  --rounded-btn: 9999px;
+  --rounded-badge: 9999px;
+}
+
+/* Okunabilirlik: ~%25 daha büyük rem tabanı (çoğu Tailwind aralığı rem ile ölçeklenir) */
+html {
+  font-size: 125%;
 }
 
 body {
@@ -38,8 +44,8 @@ body {
     system-ui,
     -apple-system,
     sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 0.875rem;
+  line-height: 1.55;
   font-weight: 400;
   letter-spacing: 0;
 }
@@ -72,30 +78,34 @@ button {
     sans-serif;
 }
 
-/* Typography scale alignment (VeriSimple.Web guide) */
+/* Tipografi: önceki px ölçeğin ~%125’i (1rem ≈ 20px html kökünde) */
 .text-xs {
-  font-size: 12px !important;
+  font-size: 0.6875rem !important;
   line-height: 1.35 !important;
 }
 .text-sm {
-  font-size: 14px !important;
+  font-size: 0.8125rem !important;
   line-height: 1.45 !important;
 }
 .text-base {
-  font-size: 15px !important;
+  font-size: 0.875rem !important;
   line-height: 1.5 !important;
 }
 .text-lg {
-  font-size: 18px !important;
+  font-size: 1rem !important;
   line-height: 1.45 !important;
 }
 .text-xl {
-  font-size: 22px !important;
+  font-size: 1.25rem !important;
   line-height: 1.35 !important;
 }
 .text-2xl {
-  font-size: 26px !important;
+  font-size: 1.375rem !important;
   line-height: 1.3 !important;
+}
+.text-3xl {
+  font-size: 1.625rem !important;
+  line-height: 1.28 !important;
 }
 
 /* Helper/meta copy */
@@ -113,34 +123,51 @@ button {
 .text-base-content\/40 { color: color-mix(in oklab, var(--color-base-content) 68%, transparent) !important; }
 .text-base-content\/50 { color: color-mix(in oklab, var(--color-base-content) 74%, transparent) !important; }
 
-/* Button + form typography */
+/* Button + form typography — Figma: hap şekli, yarı kalın, geniş yatay padding */
 .btn {
-  font-size: 15px;
+  font-size: 0.875rem;
   line-height: 1.2;
-  font-weight: 700;
+  font-weight: 600;
+  min-height: 2.75rem;
+  padding-inline: 1.5rem;
+  padding-block: 0.5rem;
+  border-width: 1px;
+  border-radius: 9999px !important;
 }
 .btn-sm {
-  font-size: 15px;
-  min-height: 2.2rem;
-  padding-inline: 0.95rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  min-height: 2.5rem;
+  padding-inline: 1.25rem;
+  padding-block: 0.45rem;
+  border-radius: 9999px !important;
+}
+.btn-xs {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  min-height: 2rem;
+  padding-inline: 1rem;
+  padding-block: 0.35rem;
+  border-radius: 9999px !important;
 }
 .input,
 .textarea,
 .select {
-  font-size: 15px;
+  font-size: 0.875rem;
   line-height: 1.45;
   font-weight: 400;
 }
 
 /* Tag/badge text */
-.badge,
-[class*="rounded"][class*="text-xs"] {
-  font-size: 12px;
+.badge {
+  font-size: 0.6875rem;
+  min-height: 1.35rem;
+  padding-inline: 0.55rem;
 }
 
 /* Slightly larger card rhythm for embedded container usage */
 .card .card-body {
-  padding: 1.2rem;
+  padding: 1.5rem;
 }
 
 /* Smooth transitions for all interactive elements */
@@ -153,12 +180,58 @@ button {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.btn {
-  border-width: 1px;
+/* Dolu mor: Figma’daki gibi düz dolgu, beyaz metin, görünür beyaz halka yok */
+.btn-primary {
+  background-color: var(--color-primary) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 6px 18px -10px rgb(147 129 255 / 0.55);
+}
+.btn-primary:hover {
+  background-color: color-mix(in oklab, var(--color-primary) 88%, black) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+.btn-primary:focus-visible,
+.btn-primary:active {
+  background-color: color-mix(in oklab, var(--color-primary) 82%, black) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+.btn-primary svg {
+  color: inherit;
+  stroke: currentColor;
 }
 
-.btn-primary {
-  box-shadow: 0 6px 14px -8px oklch(64% 0.2 284 / 0.5);
+/* Diğer dolu varyantlar: aynı hap + net dolgu */
+.btn-success:not(.btn-outline):not(.btn-ghost) {
+  border-color: transparent !important;
+}
+.btn-success:not(.btn-outline):not(.btn-ghost):hover,
+.btn-success:not(.btn-outline):not(.btn-ghost):focus-visible,
+.btn-success:not(.btn-outline):not(.btn-ghost):active {
+  border-color: transparent !important;
+}
+
+/* Çerçeveli (outline) — Figma: 1px koyu çizgi, şeffaf zemin */
+.btn-outline {
+  border-color: #000 !important;
+  color: #000 !important;
+  background-color: transparent !important;
+  box-shadow: none;
+}
+.btn-outline:hover {
+  border-color: #000 !important;
+  color: #000 !important;
+  background-color: color-mix(in oklab, var(--color-base-content) 6%, transparent) !important;
+}
+.btn-outline.btn-primary {
+  color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  background-color: transparent !important;
+}
+.btn-outline.btn-primary:hover {
+  background-color: color-mix(in oklab, var(--color-primary) 12%, transparent) !important;
 }
 
 /* Subtle focus ring */
@@ -171,7 +244,7 @@ button {
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -186,7 +259,7 @@ button {
 
 /* React Flow overrides to match theme */
 .react-flow__controls {
-  border-radius: 0.75rem !important;
+  border-radius: 0.9375rem !important;
   overflow: hidden;
   border: 1px solid oklch(94% 0.006 280) !important;
   box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.06) !important;
@@ -195,8 +268,8 @@ button {
   background: oklch(100% 0 0) !important;
   border-color: oklch(94% 0.006 280) !important;
   color: oklch(45% 0.02 280) !important;
-  width: 32px !important;
-  height: 32px !important;
+  width: 40px !important;
+  height: 40px !important;
 }
 .react-flow__controls button:hover {
   background: oklch(97.5% 0.003 280) !important;

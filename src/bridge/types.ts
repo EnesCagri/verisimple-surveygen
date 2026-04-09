@@ -36,6 +36,8 @@ export interface SurveyPayloadCondition {
   id: string;
   sourceQuestionId: string;
   answer: string;
+  /** equals_any operatörü için şık listesi */
+  answerValues?: string[];
   action: string | { jumpTo: string };
   operator?: string;
   rowIndex?: number;

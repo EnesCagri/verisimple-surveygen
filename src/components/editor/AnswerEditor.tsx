@@ -1,3 +1,4 @@
+import { answerImageSlotKey } from '../../utils/answerImages';
 import { AnswerItem } from './AnswerItem';
 
 interface AnswerEditorProps {
@@ -9,31 +10,45 @@ interface AnswerEditorProps {
 
 export function AnswerEditor({ answers, answerImages = {}, onChange, onAnswerImagesChange }: AnswerEditorProps) {
   const handleAnswerChange = (index: number, value: string) => {
-    const oldValue = answers[index];
+    const oldValue = answers[index] ?? '';
     const updated = [...answers];
     updated[index] = value;
     onChange(updated);
 
-    // Update answerImages key if the answer text changed
-    if (oldValue && answerImages[oldValue] && onAnswerImagesChange) {
+    if (!onAnswerImagesChange) return;
+
+    const oldKey = oldValue.trim() ? oldValue : answerImageSlotKey(index);
+    const newKey = value.trim() ? value : answerImageSlotKey(index);
+    const img = answerImages[oldKey];
+    if (img && oldKey !== newKey) {
       const newImages = { ...answerImages };
-      const img = newImages[oldValue];
-      delete newImages[oldValue];
-      if (value) newImages[value] = img;
+      delete newImages[oldKey];
+      newImages[newKey] = img;
       onAnswerImagesChange(newImages);
     }
   };
 
   const handleRemove = (index: number) => {
-    const removedAnswer = answers[index];
+    const removedAnswer = answers[index] ?? '';
     onChange(answers.filter((_, i) => i !== index));
 
-    // Also remove image for this answer
-    if (removedAnswer && answerImages[removedAnswer] && onAnswerImagesChange) {
-      const newImages = { ...answerImages };
-      delete newImages[removedAnswer];
-      onAnswerImagesChange(newImages);
+    if (!onAnswerImagesChange) return;
+    const removedKey = removedAnswer.trim() ? removedAnswer : answerImageSlotKey(index);
+    const next = { ...answerImages };
+    delete next[removedKey];
+
+    const reindexed: Record<string, string> = {};
+    for (const [k, v] of Object.entries(next)) {
+      const m = /^__slot_(\d+)$/.exec(k);
+      if (!m) {
+        reindexed[k] = v;
+        continue;
+      }
+      const oldIdx = Number(m[1]);
+      if (oldIdx > index) reindexed[answerImageSlotKey(oldIdx - 1)] = v;
+      else reindexed[k] = v;
     }
+    onAnswerImagesChange(reindexed);
   };
 
   const handleAdd = () => {
@@ -42,14 +57,25 @@ export function AnswerEditor({ answers, answerImages = {}, onChange, onAnswerIma
 
   const handleImageChange = (index: number, image: string | undefined) => {
     if (!onAnswerImagesChange) return;
-    const answer = answers[index];
-    if (!answer) return;
 
+    let rowText = answers[index]?.trim() ?? '';
+
+    if (image && !rowText) {
+      const placeholder = `Seçenek ${index + 1}`;
+      const updated = [...answers];
+      updated[index] = placeholder;
+      onChange(updated);
+      rowText = placeholder;
+    }
+
+    const key = rowText || answerImageSlotKey(index);
     const newImages = { ...answerImages };
     if (image) {
-      newImages[answer] = image;
+      newImages[key] = image;
+      delete newImages[answerImageSlotKey(index)];
     } else {
-      delete newImages[answer];
+      delete newImages[key];
+      delete newImages[answerImageSlotKey(index)];
     }
     onAnswerImagesChange(newImages);
   };
@@ -63,7 +89,11 @@ export function AnswerEditor({ answers, answerImages = {}, onChange, onAnswerIma
             key={index}
             index={index}
             value={answer}
-            image={answer ? answerImages[answer] : undefined}
+            image={
+              answer.trim()
+                ? answerImages[answer]
+                : answerImages[answerImageSlotKey(index)]
+            }
             onChange={handleAnswerChange}
             onImageChange={handleImageChange}
             onRemove={handleRemove}

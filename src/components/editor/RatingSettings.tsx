@@ -106,7 +106,7 @@ export function RatingSettings({ settings, onChange }: RatingSettingsProps) {
                 </svg>
               ))}
             </div>
-            <div className="flex justify-between w-full text-[10px] text-base-content/40 px-1">
+            <div className="flex justify-between w-full text-xs text-base-content/40 px-1">
               <span>{labels.low || '1'}</span>
               <span>{labels.high || String(ratingCount)}</span>
             </div>

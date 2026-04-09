@@ -30,7 +30,7 @@ export function buildSystemPrompt(
 - **image** (string, opsiyonel): Soru ile birlikte gösterilecek görsel URL.
 
 ## Koşul Operatörleri (ConditionOperator)
-- Choice soruları: "equals" (belirli cevaba eşit), "any" (herhangi bir cevap)
+- Choice soruları: "any" (herhangi bir cevap), "equals" (tek şık), "equals_any" (birden fazla şıktan biri — answerValues: string[] zorunlu), "choice_unanswered" (boş geçme / yanıt yok)
 - Rating soruları: "eq", "gt", "gte", "lt", "lte", "any"
 - TextEntry soruları: "contains", "not_contains", "exact", "is_empty", "is_not_empty", "any"
 - MatrixLikert soruları: "row_equals" (rowIndex ile birlikte), "any"
@@ -100,13 +100,17 @@ NOT: Sistem JSON formatında çıktı bekliyor, bu yüzden yanıtın SADECE geç
 { "type": "add_condition", "sourceQuestionOrder": 1, "operator": "equals", "answer": "Kötü", "actionType": "end_survey" }
 veya
 { "type": "add_condition", "sourceQuestionOrder": 1, "operator": "equals", "answer": "İyi", "actionType": "jump_to", "targetQuestionOrder": 5 }
+veya (veya-şık)
+{ "type": "add_condition", "sourceQuestionOrder": 1, "operator": "equals_any", "answerValues": ["A", "B"], "answer": "A", "actionType": "jump_to", "targetQuestionOrder": 4 }
+veya (boş geçme)
+{ "type": "add_condition", "sourceQuestionOrder": 2, "operator": "choice_unanswered", "answer": "*", "actionType": "jump_to", "targetQuestionOrder": 6 }
 - MatrixLikert için ek olarak "rowIndex": 0 eklenebilir
 - Rating için operator "eq", "gt", "gte", "lt", "lte" olabilir, answer sayısal değer (string olarak) verilir
 
 10. **Koşul Güncelleme (mevcut koşulu değiştir):**
 { "type": "update_condition", "sourceQuestionOrder": 1, "oldAnswer": "Kötü", "updates": { "answer": "Çok Kötü", "actionType": "jump_to", "targetQuestionOrder": 3 } }
 - sourceQuestionOrder + oldAnswer ile mevcut koşulu bul
-- updates içinde değiştirilecek alanlar: answer, operator, actionType, targetQuestionOrder, rowIndex
+- updates içinde değiştirilecek alanlar: answer, answerValues, operator, actionType, targetQuestionOrder, rowIndex
 
 11. **Koşul Silme:**
 { "type": "remove_condition", "sourceQuestionOrder": 1, "answer": "Kötü" }

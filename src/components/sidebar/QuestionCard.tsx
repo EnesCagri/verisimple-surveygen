@@ -3,6 +3,8 @@ import type { Question } from '../../types/survey';
 import { QuestionType } from '../../types/survey';
 import { Tooltip } from '../ui/Tooltip';
 import { questionTypeDescriptions } from '../../utils/questionTypeInfo';
+import { isQuestionRequired } from '../../utils/questionRequired';
+import { questionListPlainText } from '../../utils/questionDisplayText';
 
 interface QuestionCardProps {
   question: Question;
@@ -22,7 +24,6 @@ const typeLabels: Record<QuestionType, string> = {
   [QuestionType.Rating]: 'Derecelendirme',
   [QuestionType.MatrixLikert]: 'Matrix Likert',
   [QuestionType.Sortable]: 'Sıralama',
-  [QuestionType.RichText]: 'Zengin Metin',
 };
 
 const typeIcons: Record<QuestionType, React.JSX.Element> = {
@@ -58,13 +59,6 @@ const typeIcons: Record<QuestionType, React.JSX.Element> = {
       <line x1="12" y1="6" x2="21" y2="6" /><line x1="12" y1="12" x2="21" y2="12" /><line x1="12" y1="18" x2="21" y2="18" />
     </svg>
   ),
-  [QuestionType.RichText]: (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-    </svg>
-  ),
 };
 
 function GripIcon() {
@@ -82,7 +76,11 @@ function GripIcon() {
 
 function getTypeDetail(question: Question): string {
   if (question.type === QuestionType.TextEntry) {
-    return `${question.settings?.maxLength ?? 1250} kar.`;
+    if (question.settings?.richInformationOnly) return 'Bilgi';
+    const bits: string[] = [];
+    if (question.settings?.useRichQuestionText) bits.push('Zengin kök');
+    bits.push(`${question.settings?.maxLength ?? 1250} kar.`);
+    return bits.join(' · ');
   }
   if (question.type === QuestionType.Rating) {
     return `${question.settings?.ratingCount ?? 5} yıldız`;
@@ -91,9 +89,6 @@ function getTypeDetail(question: Question): string {
     const rows = (question.settings?.rows ?? []).filter(Boolean).length;
     const cols = (question.settings?.columns ?? []).filter(Boolean).length;
     return `${rows}×${cols}`;
-  }
-  if (question.type === QuestionType.RichText) {
-    return question.settings?.hasResponse ? 'Yanıtlı' : 'Bilgilendirme';
   }
   if (question.type === QuestionType.Sortable) {
     const count = question.answers.filter(Boolean).length;
@@ -112,7 +107,7 @@ export function QuestionCard({
   onDelete,
   onUpdate,
 }: QuestionCardProps) {
-  const { ref, isDragging } = useSortable({
+  const { ref, handleRef, isDragging } = useSortable({
     id: question.guid,
     index,
     disabled: dragDisabled,
@@ -138,14 +133,16 @@ export function QuestionCard({
       onClick={() => onSelect(question.guid)}
     >
       <div className="flex items-start gap-3 p-3.5">
-        {/* Drag handle */}
+        {/* Sürükleme yalnızca tutamaktan — karta tıklayınca seçim/düzenleme çalışır */}
         <div
-          className={`pt-1.5 ${dragDisabled ? 'cursor-not-allowed opacity-40' : 'cursor-grab active:cursor-grabbing'}`}
+          ref={handleRef}
+          className={`shrink-0 touch-none pt-1.5 ${dragDisabled ? 'cursor-not-allowed opacity-40' : 'cursor-grab active:cursor-grabbing'}`}
           title={
             dragDisabled
-              ? 'Bu sorudan koşullu bağlantı var; sürükleyerek sıra değiştirmek kapalı.'
-              : undefined
+              ? 'Koşullu bağlantı var; sıra değiştirmek kapalı.'
+              : 'Sırayı değiştirmek için sürükleyin'
           }
+          aria-label={dragDisabled ? 'Sürükleme kapalı' : 'Sürükle'}
         >
           <GripIcon />
         </div>
@@ -159,12 +156,12 @@ export function QuestionCard({
               {question.order}
             </span>
             {isControl && (
-              <span className="shrink-0 rounded-md border border-accent/35 bg-accent/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent">
+              <span className="shrink-0 rounded-md border border-accent/35 bg-accent/10 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide text-accent">
                 Kontrol
               </span>
             )}
             <span className="text-sm font-semibold truncate text-base-content/80 min-w-0">
-              {question.text || 'Yeni Soru'}
+              {questionListPlainText(question) || 'Yeni Soru'}
             </span>
           </div>
 
@@ -189,14 +186,14 @@ export function QuestionCard({
             className="pl-8 mt-2.5 flex items-center gap-2.5 w-fit cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
-              onUpdate?.(question.guid, { required: !question.required });
+              onUpdate?.(question.guid, { required: !isQuestionRequired(question) });
             }}
           >
             {/* Custom mini switch */}
-            <div className={`relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ${question.required ? 'bg-error' : 'bg-base-300'}`}>
-              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${question.required ? 'left-4.5' : 'left-0.5'}`} />
+            <div className={`relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ${isQuestionRequired(question) ? 'bg-error' : 'bg-base-300'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${isQuestionRequired(question) ? 'left-4.5' : 'left-0.5'}`} />
             </div>
-            <span className={`text-xs font-semibold transition-colors ${question.required ? 'text-error' : 'text-base-content/40'}`}>
+            <span className={`text-xs font-semibold transition-colors ${isQuestionRequired(question) ? 'text-error' : 'text-base-content/40'}`}>
               Zorunlu
             </span>
           </div>
