@@ -49,6 +49,9 @@ const START_NODE_ID = "__start__";
 const END_NODE_ID = "__end__";
 const INVALID_END_NODE_ID = "__invalid_end__";
 
+/** `seq-__start__-<hedefGuid>` — hedef UUID içinde tire olabileceği için lastIndexOf ile bölünmez */
+const SEQ_START_EDGE_PREFIX = `seq-${START_NODE_ID}-`;
+
 function collectNodePositionsFromNodes(nodes: Node[]): NodePositions {
   const positions: NodePositions = {};
   for (const node of nodes) {
@@ -674,6 +677,11 @@ function FlowCanvasInner({
         const current = sequentialEdges ?? {};
         const blocked = new Set(current.blockedEdges ?? []);
 
+        // Silinen / engellenmiş başlangıç çıkışlarını temizle (yeniden bağlanabilsin)
+        for (const id of [...blocked]) {
+          if (id.startsWith(SEQ_START_EDGE_PREFIX)) blocked.delete(id);
+        }
+
         // Remove any existing custom edge from start
         const customEdges = (current.customEdges ?? []).filter(
           (e) => e.source !== "__start__",
@@ -684,7 +692,7 @@ function FlowCanvasInner({
           sortedQuestions.length > 0 &&
           sortedQuestions[0].guid !== connection.target
         ) {
-          blocked.add(`seq-__start__-${sortedQuestions[0].guid}`);
+          blocked.add(`${SEQ_START_EDGE_PREFIX}${sortedQuestions[0].guid}`);
         }
 
         onSequentialEdgesChange({
@@ -863,11 +871,18 @@ function FlowCanvasInner({
       const blocked = new Set(current.blockedEdges ?? []);
       blocked.add(edgeId);
 
-      // Parse source/target from edge id: seq-{source}-{target}
-      const raw = edgeId.startsWith("seq-") ? edgeId.slice(4) : edgeId;
-      const splitAt = raw.lastIndexOf("-");
-      const sourceId = splitAt >= 0 ? raw.slice(0, splitAt) : raw;
-      const targetId = splitAt >= 0 ? raw.slice(splitAt + 1) : "";
+      // Parse source/target from edge id (başlangıç: seq-__start__-<guid>, guid içinde tire olabilir)
+      let sourceId: string;
+      let targetId: string;
+      if (edgeId.startsWith(SEQ_START_EDGE_PREFIX)) {
+        sourceId = START_NODE_ID;
+        targetId = edgeId.slice(SEQ_START_EDGE_PREFIX.length);
+      } else {
+        const raw = edgeId.startsWith("seq-") ? edgeId.slice(4) : edgeId;
+        const splitAt = raw.lastIndexOf("-");
+        sourceId = splitAt >= 0 ? raw.slice(0, splitAt) : raw;
+        targetId = splitAt >= 0 ? raw.slice(splitAt + 1) : "";
+      }
 
       // Remove custom sequential edge(s) from same source to keep it disconnected
       const customEdges = (current.customEdges ?? []).filter(
@@ -879,7 +894,7 @@ function FlowCanvasInner({
       // So we proactively block that default path too.
       if (sourceId === START_NODE_ID) {
         if (sortedQuestions.length > 0) {
-          blocked.add(`seq-__start__-${sortedQuestions[0].guid}`);
+          blocked.add(`${SEQ_START_EDGE_PREFIX}${sortedQuestions[0].guid}`);
         }
       } else {
         const srcIdx = sortedQuestions.findIndex((q) => q.guid === sourceId);
