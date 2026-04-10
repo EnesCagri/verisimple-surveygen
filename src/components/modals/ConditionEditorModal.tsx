@@ -245,7 +245,7 @@ export function ConditionEditorModal({
                 </label>
                 <div
                   className="flex flex-col gap-2 max-h-52 overflow-y-auto pr-0.5"
-                  title="Listeden en az birini seçin. Katılımcı seçeneklerden herhangi birini işaretlerse bu koşul sağlanır (VEYA)."
+                  title="Listeden en az birini seçin. Katılımcı bu şıklardan herhangi birini işaretlerse koşul sağlanır (VEYA)."
                 >
                   {sourceQuestion.answers.filter(Boolean).map((ans, i) => {
                     const selected = multiValues.includes(ans);
@@ -292,7 +292,9 @@ export function ConditionEditorModal({
           {needsValue && operator !== 'equals_any' && (
             <div>
               <label className="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-2 block">
-                Değer
+                {(qType === QuestionType.SingleChoice || qType === QuestionType.MultipleChoice)
+                  ? 'Şık (listeden)'
+                  : 'Değer'}
               </label>
               <ConditionValueInput
                 questionType={qType}
@@ -446,7 +448,7 @@ function ConditionValueInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
         >
-          <option value="" disabled>Bir cevap seçin</option>
+          <option value="" disabled>Şıklardan birini seçin (yazmadan)</option>
           {question.answers.filter(Boolean).map((ans, i) => (
             <option key={i} value={ans}>{ans}</option>
           ))}
