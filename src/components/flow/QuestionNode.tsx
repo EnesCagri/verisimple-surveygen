@@ -6,6 +6,12 @@ import {
   QuestionNodeTooltip,
   type ConditionSummary,
 } from "./QuestionNodeTooltip";
+import {
+  flowBuilderSourceHitStyle,
+  flowBuilderHandleSourceClass,
+  flowBuilderHandleTargetClass,
+  flowBuilderTargetHitStyle,
+} from "./flowBuilderHandle";
 
 export interface QuestionNodeData {
   order: number;
@@ -243,7 +249,7 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
     >
       <div
         className={`
-          group rounded-2xl border-2 shadow-lg min-w-[300px] max-w-[360px]
+          group flex cursor-default rounded-2xl border-2 shadow-lg min-w-[300px] max-w-[360px]
           transition-all duration-200 bg-base-100
           ${
             selected
@@ -254,6 +260,41 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
           }
         `}
       >
+        {/* Drag handle — sol çubuk */}
+        <div
+          className={`
+            flow-node-drag-handle
+            flex shrink-0 cursor-grab active:cursor-grabbing
+            items-center justify-center
+            w-10 rounded-l-2xl
+            transition-colors duration-200
+            select-none
+            ${isControl
+              ? "bg-[oklch(48%_0.14_145)] hover:bg-[oklch(42%_0.13_145)] text-white/90 hover:text-white"
+              : "bg-[#5c4ad4] hover:bg-[#4d3dc0] text-white/90 hover:text-white"
+            }
+          `}
+        >
+          <svg
+            width="14"
+            height="22"
+            viewBox="0 0 12 20"
+            fill="currentColor"
+            aria-hidden
+          >
+            <circle cx="3" cy="3" r="1.5" />
+            <circle cx="9" cy="3" r="1.5" />
+            <circle cx="3" cy="8" r="1.5" />
+            <circle cx="9" cy="8" r="1.5" />
+            <circle cx="3" cy="13" r="1.5" />
+            <circle cx="9" cy="13" r="1.5" />
+            <circle cx="3" cy="18" r="1.5" />
+            <circle cx="9" cy="18" r="1.5" />
+          </svg>
+        </div>
+
+        {/* Node içeriği */}
+        <div className="min-w-0 flex-1">
         {onDelete && (
           <button
             className={`absolute -top-2.5 -right-2.5 z-20 flex items-center justify-center w-7 h-7 rounded-full border border-error/25 bg-error text-white shadow-sm transition-all ${
@@ -286,10 +327,13 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
         <Handle
           type="target"
           position={Position.Top}
-          className="w-12! h-8! bg-transparent! border-0! -top-4! cursor-crosshair"
+          style={flowBuilderTargetHitStyle}
+          className={flowBuilderHandleTargetClass}
+          isConnectableStart={false}
+          isConnectableEnd
         />
         <div
-          className={`pointer-events-none absolute left-1/2 -translate-x-1/2 -top-1.5 z-10 w-3.5 h-3.5 rounded-full border-2 border-base-100 transition-transform duration-150 group-hover:scale-110 ${isControl ? "bg-accent" : "bg-primary"}`}
+          className={`pointer-events-none absolute left-1/2 -translate-x-1/2 -top-2 z-10 h-4 w-4 rounded-full border-2 border-base-100 transition-transform duration-150 group-hover:scale-125 ${isControl ? "bg-accent" : "bg-primary"}`}
         />
 
         {/* Header */}
@@ -331,11 +375,15 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
         <Handle
           type="source"
           position={Position.Bottom}
-          className="w-12! h-8! bg-transparent! border-0! -bottom-4! cursor-crosshair"
+          style={flowBuilderSourceHitStyle}
+          className={flowBuilderHandleSourceClass}
+          isConnectableStart
+          isConnectableEnd={false}
         />
         <div
-          className={`pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-1.5 z-10 w-3.5 h-3.5 rounded-full border-2 border-base-100 transition-transform duration-150 group-hover:scale-110 ${isControl ? "bg-accent" : "bg-primary"}`}
+          className={`pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-2 z-10 h-4 w-4 rounded-full border-2 border-base-100 transition-transform duration-150 group-hover:scale-125 ${isControl ? "bg-accent" : "bg-primary"}`}
         />
+        </div>{/* /Node içeriği */}
       </div>
 
       {/* Rich tooltip on hover (portal to avoid ReactFlow stacking contexts) */}

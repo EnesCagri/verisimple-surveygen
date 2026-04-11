@@ -1,5 +1,9 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import {
+  flowBuilderSourceHitStyle,
+  flowBuilderHandleSourceClass,
+} from './flowBuilderHandle';
 
 function StartNodeComponent({ selected }: NodeProps) {
   return (
@@ -29,9 +33,12 @@ function StartNodeComponent({ selected }: NodeProps) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="w-12! h-8! bg-transparent! border-0! -bottom-4! cursor-crosshair"
+        style={flowBuilderSourceHitStyle}
+        className={flowBuilderHandleSourceClass}
+        isConnectableStart
+        isConnectableEnd={false}
       />
-      <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-1.5 z-10 w-3.5 h-3.5 rounded-full bg-success border-2 border-base-100 transition-transform duration-150 group-hover:scale-110" />
+      <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-2 z-10 h-4 w-4 rounded-full border-2 border-base-100 bg-success transition-transform duration-150 group-hover:scale-125" />
     </div>
   );
 }

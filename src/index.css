@@ -283,10 +283,43 @@ button {
   stroke-width: 2;
 }
 .react-flow__handle {
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease;
 }
-.react-flow__handle:hover {
-  transform: scale(1.3);
+
+/*
+ * Akış düzenleyici: hedef (üst) alanı kenardan aşağı taşır — bağlantı kartın üst kısmında da bırakılabilir.
+ * Kaynak (alt) simetrik: yukarı taşır. Görünür halka yok (kullanıcı isteği).
+ */
+.flow-builder-canvas .flow-builder-handle-target-hit {
+  min-width: 6.75rem !important;
+  min-height: 4.25rem !important;
+  width: 6.75rem !important;
+  height: 4.25rem !important;
+  transform: translate(-50%, calc(-50% + 1.35rem)) !important;
+}
+
+.flow-builder-canvas .flow-builder-handle-source-hit {
+  min-width: 6.75rem !important;
+  min-height: 4.25rem !important;
+  width: 6.75rem !important;
+  height: 4.25rem !important;
+  transform: translate(-50%, calc(50% - 1.35rem)) !important;
+}
+
+/* Soru node: sürükleme yalnızca sol çubukta — RF .draggable tüm node'a grab verir */
+.flow-builder-canvas
+  .react-flow__node.draggable:has(.flow-node-drag-handle) {
+  cursor: default !important;
+}
+.flow-builder-canvas
+  .react-flow__node.draggable:has(.flow-node-drag-handle)
+  .flow-node-drag-handle {
+  cursor: grab !important;
+}
+.flow-builder-canvas
+  .react-flow__node.draggable.dragging:has(.flow-node-drag-handle)
+  .flow-node-drag-handle {
+  cursor: grabbing !important;
 }
 
 /* Preview question fade-slide animation */

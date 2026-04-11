@@ -171,6 +171,7 @@ function buildNodes(
       id: q.guid,
       type: "question",
       position: savedPos ?? defaultPos,
+      dragHandle: ".flow-node-drag-handle",
       data: {
         order: q.order,
         text: questionListPlainText(q),
@@ -1008,7 +1009,7 @@ function FlowCanvasInner({
         fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{ type: "smoothstep" }}
-        className="bg-base-200"
+        className="bg-base-200 flow-builder-canvas"
       >
         <Background
           variant={BackgroundVariant.Dots}
