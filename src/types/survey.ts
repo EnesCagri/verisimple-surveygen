@@ -172,6 +172,8 @@ export interface SequentialEdges {
 
 export interface Survey {
   id: string;
+  /** Sunucu `Survey.Guid` — host düzenleme / bridge kayıt eşlemesi */
+  surveyGuid?: string;
   title: string;
   questions: Question[];
   conditions: ConditionalRule[];

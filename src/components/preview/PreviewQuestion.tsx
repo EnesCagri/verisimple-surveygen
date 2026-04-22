@@ -66,6 +66,7 @@ export function PreviewQuestion({
           question={question}
           value={textValue}
           onChange={(text) => onTextChange?.(question.guid, text)}
+          isMobile={isMobilePreview}
         />
       );
     case QuestionType.Rating:
@@ -75,6 +76,7 @@ export function PreviewQuestion({
           value={ratingValue}
           onChange={(val) => onRatingChange?.(question.guid, val)}
           onNext={onSingleChoiceNext}
+          isMobile={isMobilePreview}
         />
       );
     case QuestionType.MatrixLikert:
@@ -92,6 +94,7 @@ export function PreviewQuestion({
           question={question}
           value={sortableValue ?? question.answers.filter(Boolean)}
           onChange={(items) => onSortableChange?.(question.guid, items)}
+          isMobile={isMobilePreview}
         />
       );
     default:
@@ -101,9 +104,45 @@ export function PreviewQuestion({
           selectedAnswers={selectedAnswers}
           onSelectAnswer={onSelectAnswer}
           onSingleChoiceNext={onSingleChoiceNext}
+          isMobile={isMobilePreview}
         />
       );
   }
+}
+
+function RequiredBadge({ compact }: { compact?: boolean }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded-lg border border-error/20 bg-error/10 font-semibold text-error ${
+        compact ? 'self-start px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'
+      }`}
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={compact ? 'h-2.5 w-2.5' : ''}>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 8v4" />
+        <path d="M12 16h.01" />
+      </svg>
+      Zorunlu
+    </span>
+  );
+}
+
+/** Soru başlığı + zorunlu rozeti; mockup’ta üst üste, geniş ekranda yan yana */
+function PreviewStemBlock({ question, isMobile }: { question: Question; isMobile: boolean }) {
+  return (
+    <div className={isMobile ? 'mb-2 flex flex-col gap-2' : 'mb-2 flex items-start gap-3'}>
+      <QuestionStemHeading
+        question={question}
+        compact={isMobile}
+        plainClassName={
+          isMobile
+            ? 'text-base font-semibold leading-snug text-base-content/85'
+            : 'flex-1 text-2xl font-semibold leading-snug text-base-content/85'
+        }
+      />
+      {isQuestionRequired(question) && <RequiredBadge compact={isMobile} />}
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════
@@ -115,11 +154,13 @@ function ChoicePreview({
   selectedAnswers,
   onSelectAnswer,
   onSingleChoiceNext,
+  isMobile = false,
 }: {
   question: Question;
   selectedAnswers: string[];
   onSelectAnswer: (guid: string, answer: string, isMultiple: boolean) => void;
   onSingleChoiceNext?: () => void;
+  isMobile?: boolean;
 }) {
   const isMultiple = question.type === QuestionType.MultipleChoice;
 
@@ -148,36 +189,21 @@ function ChoicePreview({
 
   return (
     <div className="animate-[fadeSlideIn_0.4s_ease-out]">
-      <div className="flex items-start gap-3 mb-2">
-        <QuestionStemHeading
-          question={question}
-          plainClassName="text-2xl font-semibold text-base-content/85 leading-snug flex-1"
-        />
-        {isQuestionRequired(question) && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 shrink-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v4" />
-              <path d="M12 16h.01" />
-            </svg>
-            Zorunlu
-          </span>
-        )}
-      </div>
+      <PreviewStemBlock question={question} isMobile={isMobile} />
 
       {/* Question image */}
       {question.image && (
-        <div className="mb-6 rounded-xl overflow-hidden border border-base-300/30">
-          <img src={question.image} alt="" className="w-full max-h-72 object-contain bg-base-200/30" />
+        <div className={`rounded-xl overflow-hidden border border-base-300/30 ${isMobile ? 'mb-3' : 'mb-6'}`}>
+          <img src={question.image} alt="" className={`w-full object-contain bg-base-200/30 ${isMobile ? 'max-h-40' : 'max-h-72'}`} />
         </div>
       )}
 
-      <p className="text-sm text-base-content/35 mb-8">
+      <p className={`text-base-content/35 text-sm ${isMobile ? 'mb-4' : 'mb-8'}`}>
         {isMultiple ? 'Birden fazla seçenek işaretleyebilirsiniz' : 'Bir seçenek seçin'}
       </p>
 
       {/* Grid layout for image answers, list layout for text-only */}
-      <div className={hasAnyImage ? 'grid grid-cols-2 gap-3' : 'space-y-3'}>
+      <div className={hasAnyImage ? (isMobile ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-3') : isMobile ? 'space-y-2' : 'space-y-3'}>
         {displayRows.map(({ answer, origIndex }, displayIndex) => {
           const label = choiceAnswerDisplayLabel(answer, origIndex);
           const isSelected = selectedAnswers.includes(answer);
@@ -187,7 +213,7 @@ function ChoicePreview({
               key={origIndex}
               className={`
                 w-full text-left rounded-2xl border-2 transition-all duration-200 ease-out group
-                ${hasAnyImage ? 'p-3 flex flex-col' : 'px-5 py-4 flex items-center gap-4'}
+                ${hasAnyImage ? (isMobile ? 'flex flex-col p-2' : 'flex flex-col p-3') : isMobile ? 'flex items-center gap-2 px-3 py-3' : 'flex items-center gap-4 px-5 py-4'}
                 ${isSelected
                   ? 'border-primary bg-primary/5 shadow-sm dark:border-primary dark:bg-primary/10'
                   : 'border-base-300/50 bg-base-100 hover:border-base-300 hover:bg-base-200/35 dark:hover:bg-base-200/25 hover:shadow-sm'
@@ -204,39 +230,52 @@ function ChoicePreview({
             >
               {/* Answer image */}
               {answerImage && (
-                <div className="mb-3 rounded-xl overflow-hidden bg-base-200/30">
+                <div className={`rounded-xl overflow-hidden bg-base-200/30 ${isMobile ? 'mb-2' : 'mb-3'}`}>
                   <img
                     src={answerImage}
                     alt={answer}
-                    className="w-full h-32 object-contain"
+                    className={`w-full object-contain ${isMobile ? 'h-24' : 'h-32'}`}
                   />
                 </div>
               )}
 
-              <div className={`flex items-center gap-3 ${hasAnyImage ? 'w-full' : 'flex-1'}`}>
+              <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-3'} ${hasAnyImage ? 'w-full' : 'flex-1'}`}>
                 <span
                   className={`
-                    shrink-0 w-6 h-6 flex items-center justify-center transition-all duration-200
+                    flex shrink-0 items-center justify-center transition-all duration-200
+                    ${isMobile ? 'h-5 w-5' : 'h-6 w-6'}
                     ${isMultiple ? 'rounded-md' : 'rounded-full'}
                     ${isSelected ? 'bg-primary text-primary-content shadow-sm' : 'border-2 border-base-300/55 group-hover:border-base-400/70'}
                   `}
                 >
                   {isSelected && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width={isMobile ? 10 : 14}
+                      height={isMobile ? 10 : 14}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M20 6 9 17l-5-5" />
                     </svg>
                   )}
                 </span>
-                <span className="flex items-center gap-3 flex-1">
+                <span className={`flex flex-1 items-center ${isMobile ? 'gap-2' : 'gap-3'} min-w-0`}>
                   <span
                     className={`
-                    inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold shrink-0 transition-colors duration-200 border
-                    ${isSelected ? 'bg-primary text-primary-content border-primary shadow-sm' : 'bg-base-200/80 text-base-content/45 border-base-300/60'}
+                    inline-flex shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition-colors duration-200
+                    ${isMobile ? 'h-6 w-6 text-[10px]' : 'h-7 w-7'}
+                    ${isSelected ? 'border-primary bg-primary text-primary-content shadow-sm' : 'border-base-300/60 bg-base-200/80 text-base-content/45'}
                   `}
                   >
                     {String.fromCharCode(65 + displayIndex)}
                   </span>
-                  <span className={`text-base transition-colors duration-200 ${isSelected ? 'text-base-content/90 font-medium' : 'text-base-content/60'}`}>
+                  <span
+                    className={`min-w-0 flex-1 break-words leading-snug transition-colors duration-200 ${isMobile ? 'text-sm' : 'text-base'} ${isSelected ? 'font-medium text-base-content/90' : 'text-base-content/60'}`}
+                  >
                     {label}
                   </span>
                 </span>
@@ -257,10 +296,12 @@ function TextEntryPreview({
   question,
   value,
   onChange,
+  isMobile = false,
 }: {
   question: Question;
   value: string;
   onChange: (text: string) => void;
+  isMobile?: boolean;
 }) {
   const maxLength = question.settings?.maxLength ?? 1250;
   const placeholder = question.settings?.placeholder || 'Cevabınızı buraya yazın...';
@@ -271,42 +312,27 @@ function TextEntryPreview({
 
   return (
     <div className="animate-[fadeSlideIn_0.4s_ease-out]">
-      <div className="flex items-start gap-3 mb-2">
-        <QuestionStemHeading
-          question={question}
-          plainClassName="text-2xl font-semibold text-base-content/85 leading-snug flex-1"
-        />
-        {isQuestionRequired(question) && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 shrink-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v4" />
-              <path d="M12 16h.01" />
-            </svg>
-            Zorunlu
-          </span>
-        )}
-      </div>
+      <PreviewStemBlock question={question} isMobile={isMobile} />
 
       {/* Question image */}
       {question.image && (
-        <div className="mb-6 rounded-xl overflow-hidden border border-base-300/30">
-          <img src={question.image} alt="" className="w-full max-h-72 object-contain bg-base-200/30" />
+        <div className={`rounded-xl overflow-hidden border border-base-300/30 ${isMobile ? 'mb-3' : 'mb-6'}`}>
+          <img src={question.image} alt="" className={`w-full object-contain bg-base-200/30 ${isMobile ? 'max-h-40' : 'max-h-72'}`} />
         </div>
       )}
 
       {infoOnly ? (
-        <p className="text-sm text-base-content/35 mb-4">Bilgilendirme — devam etmek için İleri&apos;ye basın.</p>
+        <p className={`text-sm text-base-content/35 ${isMobile ? 'mb-3' : 'mb-4'}`}>Bilgilendirme — devam etmek için İleri&apos;ye basın.</p>
       ) : (
         <>
-          <p className="text-sm text-base-content/35 mb-8">Cevabınızı aşağıya yazın</p>
+          <p className={`text-sm text-base-content/35 ${isMobile ? 'mb-4' : 'mb-8'}`}>Cevabınızı aşağıya yazın</p>
 
           <div className="relative">
             <textarea
               className={`
-            textarea w-full min-h-36 resize-y rounded-2xl border-2 bg-base-100 px-5 py-4
-            text-base leading-relaxed transition-all duration-200
+            textarea w-full resize-y rounded-2xl border-2 bg-base-100 leading-relaxed transition-all duration-200
             focus:outline-none
+            ${isMobile ? 'min-h-28 px-3 py-3 text-sm' : 'min-h-36 px-5 py-4 text-base'}
             ${isOverLimit
               ? 'border-error/60 focus:border-error'
               : 'border-base-300/50 focus:border-primary/40'
@@ -316,7 +342,7 @@ function TextEntryPreview({
               value={value}
               maxLength={maxLength + 50}
               onChange={(e) => onChange(e.target.value)}
-              rows={5}
+              rows={isMobile ? 4 : 5}
             />
             <div className="flex items-center justify-end mt-2 px-1">
               <span
@@ -344,98 +370,88 @@ function RatingPreview({
   value,
   onChange,
   onNext,
+  isMobile = false,
 }: {
   question: Question;
   value: number;
   onChange: (value: number) => void;
   onNext?: () => void;
+  isMobile?: boolean;
 }) {
   const ratingCount = question.settings?.ratingCount ?? 5;
   const labels = question.settings?.ratingLabels ?? { low: '', high: '' };
   const [hovered, setHovered] = useState(0);
 
   const displayValue = hovered || value;
+  const starPx = isMobile ? 26 : 32;
+  const starGap = isMobile ? 'gap-0.5' : 'gap-2';
+  const starPad = isMobile ? 'p-0.5' : 'p-1';
 
   return (
     <div className="animate-[fadeSlideIn_0.4s_ease-out]">
-      <div className="flex items-start gap-3 mb-2">
-        <QuestionStemHeading
-          question={question}
-          plainClassName="text-2xl font-semibold text-base-content/85 leading-snug flex-1"
-        />
-        {isQuestionRequired(question) && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 shrink-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v4" />
-              <path d="M12 16h.01" />
-            </svg>
-            Zorunlu
-          </span>
-        )}
-      </div>
+      <PreviewStemBlock question={question} isMobile={isMobile} />
 
       {/* Question image */}
       {question.image && (
-        <div className="mb-6 rounded-xl overflow-hidden border border-base-300/30">
-          <img src={question.image} alt="" className="w-full max-h-72 object-contain bg-base-200/30" />
+        <div className={`rounded-xl overflow-hidden border border-base-300/30 ${isMobile ? 'mb-3' : 'mb-6'}`}>
+          <img src={question.image} alt="" className={`w-full object-contain bg-base-200/30 ${isMobile ? 'max-h-40' : 'max-h-72'}`} />
         </div>
       )}
 
-      <p className="text-sm text-base-content/35 mb-8">Derecelendirme yapın</p>
+      <p className={`text-sm text-base-content/35 ${isMobile ? 'mb-4' : 'mb-8'}`}>Derecelendirme yapın</p>
 
-      <div className="flex flex-col items-center gap-4">
-        {/* Stars */}
-        <div
-          className="flex items-center gap-2"
-          onMouseLeave={() => setHovered(0)}
-        >
-          {Array.from({ length: ratingCount }, (_, i) => {
-            const starValue = i + 1;
-            const isFilled = starValue <= displayValue;
-            return (
-              <button
-                key={i}
-                className="group p-1 transition-transform duration-150 hover:scale-110 focus:outline-none"
-                onMouseEnter={() => setHovered(starValue)}
-                onClick={() => {
-                  if (value === starValue) {
-                    onChange(0);
-                    return;
-                  }
-                  onChange(starValue);
-                  setTimeout(() => onNext?.(), 300);
-                }}
-              >
-                <svg
-                  width="32"
-                  height="32"
-                  viewBox="0 0 24 24"
-                  fill={isFilled ? 'oklch(75% 0.18 60)' : 'none'}
-                  stroke={isFilled ? 'oklch(75% 0.18 60)' : 'oklch(70% 0.02 280)'}
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="transition-all duration-200"
+      <div className={`flex flex-col items-center ${isMobile ? 'gap-3' : 'gap-4'}`}>
+        {/* Yıldızlar + uç etiketleri aynı iç genişlikte (web ile aynı likert hizası) */}
+        <div className="inline-flex max-w-full flex-col items-stretch gap-2">
+          <div className={`flex flex-wrap items-center justify-center ${starGap}`} onMouseLeave={() => setHovered(0)}>
+            {Array.from({ length: ratingCount }, (_, i) => {
+              const starValue = i + 1;
+              const isFilled = starValue <= displayValue;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={`group ${starPad} transition-transform duration-150 hover:scale-110 focus:outline-none`}
+                  onMouseEnter={() => setHovered(starValue)}
+                  onClick={() => {
+                    if (value === starValue) {
+                      onChange(0);
+                      return;
+                    }
+                    onChange(starValue);
+                    setTimeout(() => onNext?.(), 300);
+                  }}
                 >
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>
-              </button>
-            );
-          })}
+                  <svg
+                    width={starPx}
+                    height={starPx}
+                    viewBox="0 0 24 24"
+                    fill={isFilled ? 'oklch(75% 0.18 60)' : 'none'}
+                    stroke={isFilled ? 'oklch(75% 0.18 60)' : 'oklch(70% 0.02 280)'}
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="transition-all duration-200"
+                  >
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                </button>
+              );
+            })}
+          </div>
+
+          {(labels.low || labels.high) && (
+            <div
+              className={`flex w-full justify-between gap-2 text-base-content/40 ${isMobile ? 'text-[11px] leading-tight' : 'text-xs'}`}
+            >
+              <span className="min-w-0 max-w-[48%] text-left leading-snug">{labels.low}</span>
+              <span className="min-w-0 max-w-[48%] text-right leading-snug">{labels.high}</span>
+            </div>
+          )}
         </div>
 
-        {/* Endpoint labels */}
-        {(labels.low || labels.high) && (
-          <div className="flex justify-between w-full max-w-xs text-xs text-base-content/40">
-            <span>{labels.low}</span>
-            <span>{labels.high}</span>
-          </div>
-        )}
-
-        {/* Selected value indicator */}
         {value > 0 && (
-          <div className="text-sm font-medium text-primary/70">
+          <div className={`font-medium text-primary/70 ${isMobile ? 'text-xs' : 'text-sm'}`}>
             {value} / {ratingCount}
           </div>
         )}
@@ -454,11 +470,13 @@ function SortableItem({
   index,
   sortableId,
   questionGuid,
+  isMobile = false,
 }: {
   item: string;
   index: number;
   sortableId: string;
   questionGuid: string;
+  isMobile?: boolean;
 }) {
   const { ref, handleRef, isDragging, sortable } = useSortable({
     id: sortableId,
@@ -479,8 +497,9 @@ function SortableItem({
     <div
       ref={setNodeRef}
       className={`
-        flex touch-none items-center gap-3 px-5 py-4 rounded-2xl border-2 bg-base-100 cursor-grab active:cursor-grabbing
+        flex touch-none items-center rounded-2xl border-2 bg-base-100 cursor-grab active:cursor-grabbing
         transition-[border-color,box-shadow,opacity,transform,background-color] duration-200 select-none group
+        ${isMobile ? 'gap-2 px-3 py-2.5' : 'gap-3 px-5 py-4'}
         ${isDragging
           ? 'border-primary/50 bg-primary/4 shadow-lg scale-[1.02] opacity-80 z-50'
           : 'border-base-300/50 hover:border-primary/30 hover:shadow-sm'
@@ -490,7 +509,8 @@ function SortableItem({
       {/* Rank number */}
       <span
         className={`
-          inline-flex items-center justify-center w-8 h-8 rounded-xl text-sm font-bold tabular-nums shrink-0 transition-none
+          inline-flex shrink-0 items-center justify-center rounded-xl font-bold tabular-nums transition-none
+          ${isMobile ? 'h-7 w-7 text-xs' : 'h-8 w-8 text-sm'}
           ${isDragging ? 'bg-primary text-primary-content' : 'bg-primary/10 text-primary/70'}
         `}
       >
@@ -514,26 +534,30 @@ function SortableItem({
       </svg>
 
       {/* Item text */}
-      <span className={`text-base flex-1 transition-colors duration-200 ${isDragging ? 'text-primary font-medium' : 'text-base-content/70'}`}>
+      <span
+        className={`min-w-0 flex-1 break-words leading-snug transition-colors duration-200 ${isMobile ? 'text-sm' : 'text-base'} ${isDragging ? 'font-medium text-primary' : 'text-base-content/70'}`}
+      >
         {item}
       </span>
 
       {/* Up/Down arrows hint */}
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="shrink-0 text-base-content/15 group-hover:text-base-content/30 transition-colors"
-      >
-        <path d="M12 5v14" />
-        <path d="m18 13-6 6-6-6" />
-        <path d="m18 11-6-6-6 6" />
-      </svg>
+      {!isMobile && (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="shrink-0 text-base-content/15 transition-colors group-hover:text-base-content/30"
+        >
+          <path d="M12 5v14" />
+          <path d="m18 13-6 6-6-6" />
+          <path d="m18 11-6-6-6 6" />
+        </svg>
+      )}
     </div>
   );
 }
@@ -542,10 +566,12 @@ function SortablePreview({
   question,
   value,
   onChange,
+  isMobile = false,
 }: {
   question: Question;
   value: string[];
   onChange: (items: string[]) => void;
+  isMobile?: boolean;
 }) {
   const canonical = useMemo(() => question.answers.filter(Boolean), [question.answers]);
   const rawValue = value.length > 0 ? value : canonical;
@@ -585,31 +611,16 @@ function SortablePreview({
 
   return (
     <div className="animate-[fadeSlideIn_0.4s_ease-out]">
-      <div className="flex items-start gap-3 mb-2">
-        <QuestionStemHeading
-          question={question}
-          plainClassName="text-2xl font-semibold text-base-content/85 leading-snug flex-1"
-        />
-        {isQuestionRequired(question) && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 shrink-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v4" />
-              <path d="M12 16h.01" />
-            </svg>
-            Zorunlu
-          </span>
-        )}
-      </div>
+      <PreviewStemBlock question={question} isMobile={isMobile} />
 
       {/* Question image */}
       {question.image && (
-        <div className="mb-6 rounded-xl overflow-hidden border border-base-300/30">
-          <img src={question.image} alt="" className="w-full max-h-72 object-contain bg-base-200/30" />
+        <div className={`rounded-xl overflow-hidden border border-base-300/30 ${isMobile ? 'mb-3' : 'mb-6'}`}>
+          <img src={question.image} alt="" className={`w-full object-contain bg-base-200/30 ${isMobile ? 'max-h-40' : 'max-h-72'}`} />
         </div>
       )}
 
-      <p className="text-sm text-base-content/35 mb-8">
+      <p className={`text-sm text-base-content/35 ${isMobile ? 'mb-4' : 'mb-8'}`}>
         Öğeleri sürükleyerek tercih sıranıza göre sıralayın
       </p>
 
@@ -617,7 +628,7 @@ function SortablePreview({
         <p className="text-center py-8 text-base-content/30 text-sm">Sıralama öğesi eklenmemiş</p>
       ) : rowIds.length === items.length ? (
         <DragDropProvider onDragEnd={handleDragEnd}>
-          <div className="flex flex-col gap-2.5">
+          <div className={`flex flex-col ${isMobile ? 'gap-2' : 'gap-2.5'}`}>
             {items.map((item, index) => (
               <SortableItem
                 key={rowIds[index]}
@@ -625,6 +636,7 @@ function SortablePreview({
                 questionGuid={question.guid}
                 item={item}
                 index={index}
+                isMobile={isMobile}
               />
             ))}
           </div>
@@ -656,28 +668,17 @@ function MatrixLikertPreview({
 
   const questionHeader = (
     <>
-      <div className="flex items-start gap-3 mb-2">
-        <QuestionStemHeading
-          question={question}
-          plainClassName={`font-semibold text-base-content/85 leading-snug flex-1 ${isMobile ? 'text-lg' : 'text-2xl'}`}
-        />
-        {isQuestionRequired(question) && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 shrink-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v4" />
-              <path d="M12 16h.01" />
-            </svg>
-            Zorunlu
-          </span>
-        )}
-      </div>
+      <PreviewStemBlock question={question} isMobile={isMobile} />
       {question.image && (
-        <div className="mb-4 rounded-xl overflow-hidden border border-base-300/30">
-          <img src={question.image} alt="" className="w-full max-h-48 object-contain bg-base-200/30" />
+        <div className={`rounded-xl overflow-hidden border border-base-300/30 ${isMobile ? 'mb-3' : 'mb-4'}`}>
+          <img
+            src={question.image}
+            alt=""
+            className={`w-full object-contain bg-base-200/30 ${isMobile ? 'max-h-32' : 'max-h-48'}`}
+          />
         </div>
       )}
-      <p className="text-sm text-base-content/35 mb-4">
+      <p className={`text-base-content/35 ${isMobile ? 'mb-3 text-[13px] leading-snug' : 'mb-4 text-sm'}`}>
         {isMultiple ? 'Her satır için birden fazla seçenek işaretleyebilirsiniz' : 'Her satır için bir seçenek seçin'}
       </p>
     </>
@@ -686,11 +687,8 @@ function MatrixLikertPreview({
   if (rows.length === 0 || columns.length === 0) {
     return (
       <div className="animate-[fadeSlideIn_0.4s_ease-out]">
-        <QuestionStemHeading
-          question={question}
-          plainClassName="text-2xl font-semibold text-base-content/85 mb-2 leading-snug"
-        />
-        <p className="text-sm text-base-content/40 mt-6">
+        <PreviewStemBlock question={question} isMobile={isMobile} />
+        <p className={`text-base-content/40 ${isMobile ? 'mt-4 text-xs' : 'mt-6 text-sm'}`}>
           Bu soru henüz yapılandırılmamış (satır/sütun eksik).
         </p>
       </div>
@@ -809,13 +807,14 @@ function MatrixLikertMobileAccordion({
             >
               {/* Accordion header */}
               <button
-                className="w-full flex items-center justify-between px-4 py-3 text-left gap-3"
+                type="button"
+                className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
                 onClick={() => setOpenRow(isOpen ? -1 : ri)}
               >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   {/* Done indicator */}
-                  <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center border-2 transition-all ${
-                    isDone ? 'bg-success border-success text-white' : 'border-base-300/50'
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                    isDone ? 'border-success bg-success text-white' : 'border-base-300/50'
                   }`}>
                     {isDone && (
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
@@ -823,7 +822,7 @@ function MatrixLikertMobileAccordion({
                       </svg>
                     )}
                   </span>
-                  <span className="text-sm font-medium text-base-content/80 truncate">{row}</span>
+                  <span className="truncate text-xs font-medium text-base-content/80">{row}</span>
                   {isDone && !isOpen && (
                     <span className="text-xs text-base-content/40 shrink-0">· {selectedCols.join(', ')}</span>
                   )}
@@ -839,16 +838,17 @@ function MatrixLikertMobileAccordion({
 
               {/* Accordion body */}
               {isOpen && (
-                <div className="px-4 pb-4 flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5 px-3 pb-3">
                   {columns.map((col, ci) => {
                     const isSelected = selectedCols.includes(col);
                     return (
                       <button
+                        type="button"
                         key={ci}
                         onClick={() => handleSelect(ri, col)}
-                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl border text-sm text-left transition-all duration-200 ${
+                        className={`flex w-full items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-xs transition-all duration-200 ${
                           isSelected
-                            ? 'border-primary bg-primary/8 text-primary font-medium'
+                            ? 'border-primary bg-primary/8 font-medium text-primary'
                             : 'border-base-300/40 bg-base-100 text-base-content/70 active:bg-base-200'
                         }`}
                       >
@@ -861,7 +861,7 @@ function MatrixLikertMobileAccordion({
                             </svg>
                           )}
                         </span>
-                        {col}
+                        <span className="min-w-0 flex-1 break-words leading-snug">{col}</span>
                       </button>
                     );
                   })}

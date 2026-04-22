@@ -1,11 +1,13 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Question, ConditionalRule, ConditionInput, NodePositions, SequentialEdges } from '../types/survey';
 import { findConflictingCondition } from '../utils/conditionDuplicate';
 import type { SurveyPayload } from '../bridge/types';
-import { createQuestion } from '../utils/question';
+import { createQuestion, duplicateQuestionAsCopy } from '../utils/question';
 import { normalizeSurveyQuestion } from '../utils/normalizeSurveyQuestion';
 import { generateId } from '../utils/id';
 import { normalizeSequentialEdges } from '../utils/flowDagreLayout';
+import { readBootstrapSurveyGuid } from '../bridge/vsSurveyGenInitial';
+import { isVsSurveyGenExplicitNewMode } from '../bridge/vsHostInitial';
 
 /**
  * Hook for managing a single survey's questions and conditions.
@@ -17,7 +19,26 @@ export function useSurvey(
   initialConditions: ConditionalRule[] = [],
   initialNodePositions?: NodePositions,
   initialSequentialEdges?: SequentialEdges,
+  initialSurveyGuid?: string,
 ) {
+  const [surveyGuid, setSurveyGuid] = useState<string | undefined>(() =>
+    initialSurveyGuid?.trim() ? initialSurveyGuid.trim() : undefined,
+  );
+
+  useEffect(() => {
+    const fromProp = initialSurveyGuid?.trim();
+    if (fromProp) {
+      setSurveyGuid(fromProp);
+      return;
+    }
+    if (isVsSurveyGenExplicitNewMode()) {
+      setSurveyGuid(undefined);
+      return;
+    }
+    const boot = readBootstrapSurveyGuid();
+    setSurveyGuid(boot ?? undefined);
+  }, [initialSurveyGuid]);
+
   const [title, setTitle] = useState(initialTitle);
   const [questions, setQuestions] = useState<Question[]>(() =>
     initialQuestions.map(normalizeSurveyQuestion),
@@ -121,6 +142,30 @@ export function useSurvey(
       });
     },
     [questions, selectedId],
+  );
+
+  /** Soruyu hemen altına kopyalar; koşullar kopyalanmaz; akış konumu hafif kaydırılır. */
+  const duplicateQuestion = useCallback(
+    (guid: string) => {
+      const sorted = [...questions].sort((a, b) => a.order - b.order);
+      const idx = sorted.findIndex((q) => q.guid === guid);
+      if (idx < 0) return;
+      const dup = duplicateQuestionAsCopy(sorted[idx]);
+      const dupGuid = dup.guid;
+      const nextList = [...sorted.slice(0, idx + 1), dup, ...sorted.slice(idx + 1)].map((q, i) => ({
+        ...q,
+        order: i + 1,
+      }));
+      setQuestions(nextList);
+      setNodePositions((prev) => {
+        if (!prev) return prev;
+        const pos = prev[guid];
+        if (!pos) return prev;
+        return { ...prev, [dupGuid]: { x: pos.x + 28, y: pos.y + 20 } };
+      });
+      setSelectedId(dupGuid);
+    },
+    [questions],
   );
 
   const reorderQuestions = useCallback((reordered: Question[]) => {
@@ -245,10 +290,10 @@ export function useSurvey(
   }, [questions, conditions, sequentialEdges]);
 
   /**
-   * Structured payload for the JS bridge (includes title + surveyId).
+   * Structured payload for the JS bridge (`id`, `surveyGuid`, `title`, …).
    */
   const getSurveyPayload = useCallback(
-    (surveyId: string): SurveyPayload => {
+    (surveyClientId: string): SurveyPayload => {
       const mappedQuestions: SurveyPayload['questions'] = questions.map(
         ({ order, text, type, answers, guid, settings, required, image }) => ({
           order,
@@ -262,22 +307,38 @@ export function useSurvey(
         }),
       );
 
-      const payload: SurveyPayload = { surveyId, title, questions: mappedQuestions };
-
-      if (conditions.length > 0) {
-        payload.conditions = conditions.map((c) => ({
-          id: c.id,
-          sourceQuestionId: c.sourceQuestionId,
-          answer: c.answer,
-          action:
-            c.action.type === 'end_survey'
-              ? 'end_survey'
-              : { jumpTo: c.action.targetQuestionId },
-          ...(c.operator && c.operator !== 'equals' && c.operator !== 'any' ? { operator: c.operator } : {}),
-          ...(c.rowIndex !== undefined ? { rowIndex: c.rowIndex } : {}),
-          ...(c.answerValues && c.answerValues.length > 0 ? { answerValues: c.answerValues } : {}),
-        }));
+      const payload: SurveyPayload = {
+        id: surveyClientId,
+        surveyId: surveyClientId,
+        title,
+        questions: mappedQuestions,
+      };
+      // Düzenleme: state → host bootstrap yedek (React/hydrate edge case)
+      const effectiveSurveyGuid =
+        (surveyGuid && surveyGuid.trim()) || readBootstrapSurveyGuid();
+      if (effectiveSurveyGuid) {
+        payload.surveyGuid = effectiveSurveyGuid;
       }
+
+      payload.conditions =
+        conditions.length > 0
+          ? conditions.map((c) => ({
+              id: c.id,
+              sourceQuestionId: c.sourceQuestionId,
+              answer: c.answer,
+              action:
+                c.action.type === 'end_survey'
+                  ? 'end_survey'
+                  : { jumpTo: c.action.targetQuestionId },
+              ...(c.operator && c.operator !== 'equals' && c.operator !== 'any'
+                ? { operator: c.operator }
+                : {}),
+              ...(c.rowIndex !== undefined ? { rowIndex: c.rowIndex } : {}),
+              ...(c.answerValues && c.answerValues.length > 0
+                ? { answerValues: c.answerValues }
+                : {}),
+            }))
+          : null;
 
       if (sequentialEdges && (sequentialEdges.blockedEdges?.length || sequentialEdges.customEdges?.length)) {
         payload.sequentialEdges = sequentialEdges;
@@ -285,7 +346,7 @@ export function useSurvey(
 
       return payload;
     },
-    [title, questions, conditions, sequentialEdges],
+    [title, questions, conditions, sequentialEdges, surveyGuid],
   );
 
   return {
@@ -301,6 +362,7 @@ export function useSurvey(
     addQuestionWithData,
     updateQuestion,
     deleteQuestion,
+    duplicateQuestion,
     reorderQuestions,
     selectQuestion,
     addCondition,

@@ -5,6 +5,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { questionTypeDescriptions } from '../../utils/questionTypeInfo';
 import { isQuestionRequired } from '../../utils/questionRequired';
 import { questionListPlainText } from '../../utils/questionDisplayText';
+import { isQuestionIncomplete } from '../../utils/question';
 
 interface QuestionCardProps {
   question: Question;
@@ -14,6 +15,7 @@ interface QuestionCardProps {
   dragDisabled?: boolean;
   onSelect: (guid: string) => void;
   onDelete: (guid: string) => void;
+  onDuplicate: (guid: string) => void;
   onUpdate?: (guid: string, updates: Partial<Omit<Question, 'guid'>>) => void;
 }
 
@@ -105,6 +107,7 @@ export function QuestionCard({
   dragDisabled = false,
   onSelect,
   onDelete,
+  onDuplicate,
   onUpdate,
 }: QuestionCardProps) {
   const { ref, handleRef, isDragging } = useSortable({
@@ -115,6 +118,7 @@ export function QuestionCard({
 
   const detail = getTypeDetail(question);
   const isControl = question.settings?.isControlQuestion === true;
+  const incomplete = isQuestionIncomplete(question);
 
   return (
     <div
@@ -122,11 +126,15 @@ export function QuestionCard({
       className={`
         group relative rounded-2xl bg-base-100 cursor-pointer
         transition-all duration-200 ease-out
-        ${isSelected
-          ? `shadow-md ring-2 ring-primary/50 bg-primary/3 ${isControl ? 'border border-accent/35' : ''}`
-          : isControl
-            ? 'shadow-sm hover:shadow-md border-2 border-accent/40 bg-accent/6 hover:border-accent/55'
-            : 'shadow-sm hover:shadow-md border border-base-300/60 hover:border-primary/30'
+        ${incomplete
+          ? isSelected
+            ? 'shadow-md ring-2 ring-error/50 bg-error/3 border border-error/30'
+            : 'shadow-sm hover:shadow-md border-2 border-error/45 hover:border-error/65'
+          : isSelected
+            ? `shadow-md ring-2 ring-primary/50 bg-primary/3 ${isControl ? 'border border-accent/35' : ''}`
+            : isControl
+              ? 'shadow-sm hover:shadow-md border-2 border-accent/40 bg-accent/6 hover:border-accent/55'
+              : 'shadow-sm hover:shadow-md border border-base-300/60 hover:border-primary/30'
         }
         ${isDragging ? 'opacity-40 scale-[0.97] rotate-1' : ''}
       `}
@@ -149,19 +157,25 @@ export function QuestionCard({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 min-w-0">
+          <div className="flex items-start gap-2 mb-1 min-w-0">
             <span
-              className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-sm font-bold shrink-0 ${isControl ? 'bg-accent/15 text-accent' : 'bg-primary/10 text-primary'}`}
+              className={`inline-flex items-center justify-center w-6 h-6 shrink-0 rounded-lg text-sm font-bold leading-none ${incomplete ? 'bg-error/15 text-error' : isControl ? 'bg-accent/15 text-accent' : 'bg-primary/10 text-primary'}`}
             >
               {question.order}
             </span>
-            {isControl && (
+            {isControl && !incomplete && (
               <span className="shrink-0 rounded-md border border-accent/35 bg-accent/10 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide text-accent">
                 Kontrol
               </span>
             )}
-            <span className="text-sm font-semibold truncate text-base-content/80 min-w-0">
-              {questionListPlainText(question) || 'Yeni Soru'}
+            <span
+              className={`min-w-0 flex-1 text-sm font-semibold leading-snug ${
+                incomplete
+                  ? 'text-error/70 italic wrap-break-word'
+                  : 'truncate text-base-content/80'
+              }`}
+            >
+              {questionListPlainText(question) || 'Başlık girilmedi'}
             </span>
           </div>
 
@@ -199,20 +213,38 @@ export function QuestionCard({
           </div>
         </div>
 
-        {/* Delete button */}
-        <button
-          className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded-lg hover:bg-error/10 text-base-content/30 hover:text-error"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(question.guid);
-          }}
-          title="Soruyu sil"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <div className="flex shrink-0 flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          <Tooltip content="Aynı soruyu kopyala (hemen altına)" position="left">
+            <button
+              type="button"
+              className="p-1 rounded-lg hover:bg-primary/10 text-base-content/35 hover:text-primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDuplicate(question.guid);
+              }}
+              title="Kopyala"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+          </Tooltip>
+          <button
+            type="button"
+            className="p-1 rounded-lg hover:bg-error/10 text-base-content/30 hover:text-error"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(question.guid);
+            }}
+            title="Soruyu sil"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,95 +1,116 @@
-import { useCallback, useState, useEffect } from 'react';
-import { Dashboard } from './components/dashboard/Dashboard';
+import { useCallback, useState } from 'react';
+import type {
+  Survey,
+  Question,
+  ConditionalRule,
+  NodePositions,
+  SequentialEdges,
+} from './types/survey';
 import { BuilderPage } from './components/builder/BuilderPage';
-import { useSurveyStore } from './hooks/useSurveyStore';
-import type { Question, ConditionalRule, NodePositions, SequentialEdges } from './types/survey';
+import { generateId } from './utils/id';
+import { readVsSurveyGenInitialSurvey } from './bridge/vsSurveyGenInitial';
+import {
+  hasVsSurveyGenInitialKey,
+  isVsSurveyGenExplicitNewMode,
+} from './bridge/vsHostInitial';
 
-type Page =
-  | { type: 'dashboard' }
-  | { type: 'builder'; surveyId: string };
+const DRAFT_KEY = 'vs:survengine:draft';
 
-const PAGE_KEY = 'vs:page';
+function createEmptySurvey(): Survey {
+  const now = new Date().toISOString();
+  return {
+    id: generateId(),
+    title: 'Yeni Anket',
+    questions: [],
+    conditions: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
-function loadPage(): Page {
+function loadDraft(): Survey {
   try {
-    const raw = localStorage.getItem(PAGE_KEY);
-    if (!raw) return { type: 'dashboard' };
-    const parsed = JSON.parse(raw) as Page;
-    if (parsed?.type === 'builder' && parsed.surveyId) return parsed;
-    return { type: 'dashboard' };
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Survey;
+      if (parsed?.id && Array.isArray(parsed.questions)) return parsed;
+    }
   } catch {
-    return { type: 'dashboard' };
+    /* ignore */
+  }
+  return createEmptySurvey();
+}
+
+function saveDraft(survey: Survey): void {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(survey));
+  } catch {
+    /* ignore */
   }
 }
 
-function savePage(page: Page) {
-  try {
-    localStorage.setItem(PAGE_KEY, JSON.stringify(page));
-  } catch { /* ignore */ }
+type SaveUpdates = {
+  title: string;
+  questions: Question[];
+  conditions: ConditionalRule[];
+  nodePositions?: NodePositions;
+  sequentialEdges?: SequentialEdges;
+};
+
+/**
+ * VeriSimple sözleşmesi:
+ * - `__VS_SURVEYGEN_INITIAL__` özelliği yok → standalone: `localStorage` taslağı.
+ * - Değer `null` → host “yeni anket”; taslakla **asla** birleştirilmez.
+ * - Nesne → düzenleme hydrate (veya geçersiz nesnede boş şablon).
+ */
+function initialSurvey(): Survey {
+  if (typeof window === 'undefined') {
+    return createEmptySurvey();
+  }
+  if (!hasVsSurveyGenInitialKey()) {
+    return loadDraft();
+  }
+  if (isVsSurveyGenExplicitNewMode()) {
+    return createEmptySurvey();
+  }
+  const hydrated = readVsSurveyGenInitialSurvey();
+  return hydrated ?? createEmptySurvey();
 }
 
 export default function App() {
-  const [page, setPageState] = useState<Page>(() => loadPage());
-  const { surveys, createSurvey, createDemoSurvey, updateSurvey, deleteSurvey, getSurvey } =
-    useSurveyStore();
+  const [survey, setSurvey] = useState<Survey>(initialSurvey);
 
-  const setPage = useCallback((p: Page) => {
-    savePage(p);
-    setPageState(p);
+  const handleSave = useCallback((id: string, updates: SaveUpdates) => {
+    setSurvey((prev) => {
+      const next: Survey = {
+        ...prev,
+        ...updates,
+        id,
+        updatedAt: new Date().toISOString(),
+      };
+      saveDraft(next);
+      return next;
+    });
   }, []);
 
-  // If persisted page points to a builder but survey no longer exists, fall back to dashboard
-  useEffect(() => {
-    if (page.type === 'builder' && !getSurvey(page.surveyId)) {
-      setPage({ type: 'dashboard' });
-    }
-  }, [page, getSurvey, setPage]);
-
-  const handleCreateNew = () => {
-    const newSurvey = createSurvey();
-    setPage({ type: 'builder', surveyId: newSurvey.id });
-  };
-
-  const handleCreateDemo = () => {
-    const demo = createDemoSurvey();
-    setPage({ type: 'builder', surveyId: demo.id });
-  };
-
-  const handleOpenSurvey = (id: string) => {
-    setPage({ type: 'builder', surveyId: id });
-  };
-
-  const handleBack = () => {
-    setPage({ type: 'dashboard' });
-  };
-
-  const handleSave = useCallback(
-    (id: string, updates: { title: string; questions: Question[]; conditions: ConditionalRule[]; nodePositions?: NodePositions; sequentialEdges?: SequentialEdges }) => {
-      updateSurvey(id, updates);
-    },
-    [updateSurvey],
-  );
-
-  if (page.type === 'builder') {
-    const survey = getSurvey(page.surveyId);
-    if (!survey) return null; // useEffect will redirect
-    return (
-      <BuilderPage
-        key={survey.id}
-        survey={survey}
-        onSave={handleSave}
-        onBack={handleBack}
-      />
-    );
-  }
+  const handleBridgeSurveyGuid = useCallback((surveyGuid: string) => {
+    setSurvey((prev) => {
+      const next: Survey = {
+        ...prev,
+        surveyGuid,
+        updatedAt: new Date().toISOString(),
+      };
+      saveDraft(next);
+      return next;
+    });
+  }, []);
 
   return (
-    <Dashboard
-      surveys={surveys}
-      onCreateNew={handleCreateNew}
-      onCreateDemo={handleCreateDemo}
-      onOpenSurvey={handleOpenSurvey}
-      onDeleteSurvey={deleteSurvey}
+    <BuilderPage
+      key={survey.id}
+      survey={survey}
+      onSave={handleSave}
+      onBridgeSurveyGuid={handleBridgeSurveyGuid}
     />
   );
 }

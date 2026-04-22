@@ -11,10 +11,19 @@
 // ── Payload sent from React → Host ──
 
 export interface SurveyPayload {
-  surveyId: string;
+  /** Builder içi istemci kimliği (yerel draft, React key) */
+  id: string;
+  /** Sunucu Survey.Guid — düzenlemede dolu; yeni ankette host `undefined` bekleyebilir */
+  surveyGuid?: string;
+  /**
+   * @deprecated `id` ile aynı anlamda; eski Razor örnekleri için korunur.
+   * Yeni host sözleşmesi `id` + `surveyGuid` kullanır.
+   */
+  surveyId?: string;
   title: string;
   questions: SurveyPayloadQuestion[];
-  conditions?: SurveyPayloadCondition[];
+  /** Boş anketlerde host `null` bekleyebilir (alan yine de gönderilir). */
+  conditions?: SurveyPayloadCondition[] | null;
   sequentialEdges?: {
     blockedEdges?: string[];
     customEdges?: Array<{ source: string; target: string }>;
@@ -45,9 +54,16 @@ export interface SurveyPayloadCondition {
 
 // ── Response from Host → React ──
 
+export interface BridgeSaveResponseData {
+  surveyGuid?: string;
+  [key: string]: unknown;
+}
+
 export interface BridgeResponse {
   success: boolean;
   message?: string;
+  /** Bazı Razor yanıtları kökte; bazıları `data.surveyGuid` içinde döner. */
+  surveyGuid?: string;
   data?: unknown;
 }
 
@@ -69,8 +85,18 @@ export interface VeriSimpleBridge {
 
 // ── Augment the global Window type ──
 
+/** Host, SurveyGen mount öncesi set eder (`readVsSurveyGenInitialSurvey`). */
+export interface VsSurveyGenInitial {
+  surveyGuid?: string | null;
+  title?: string;
+  questions?: unknown;
+  conditions?: unknown;
+}
+
 declare global {
   interface Window {
     VeriSimpleBridge?: VeriSimpleBridge;
+    /** VeriSimple: yeni anket = `null`; düzenle = nesne; standalone = özellik yok */
+    __VS_SURVEYGEN_INITIAL__?: VsSurveyGenInitial | null;
   }
 }

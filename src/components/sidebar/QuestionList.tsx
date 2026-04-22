@@ -11,6 +11,7 @@ interface QuestionListProps {
   conditions: ConditionalRule[];
   onSelect: (guid: string) => void;
   onDelete: (guid: string) => void;
+  onDuplicate: (guid: string) => void;
   onReorder: (questions: Question[]) => void;
   onUpdate?: (guid: string, updates: Partial<Omit<Question, 'guid'>>) => void;
 }
@@ -21,6 +22,7 @@ export function QuestionList({
   conditions,
   onSelect,
   onDelete,
+  onDuplicate,
   onReorder,
   onUpdate,
 }: QuestionListProps) {
@@ -75,6 +77,7 @@ export function QuestionList({
               dragDisabled={questionHasOutgoingCondition(question.guid, conditions)}
               onSelect={onSelect}
               onDelete={onDelete}
+              onDuplicate={onDuplicate}
               onUpdate={onUpdate}
             />
           ))}

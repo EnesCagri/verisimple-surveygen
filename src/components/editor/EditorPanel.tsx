@@ -5,9 +5,15 @@ interface EditorPanelProps {
   question: Question | null;
   onUpdate: (guid: string, updates: Partial<Omit<Question, 'guid'>>) => void;
   onDeleteQuestion: (guid: string) => void;
+  onDuplicateQuestion: (guid: string) => void;
 }
 
-export function EditorPanel({ question, onUpdate, onDeleteQuestion }: EditorPanelProps) {
+export function EditorPanel({
+  question,
+  onUpdate,
+  onDeleteQuestion,
+  onDuplicateQuestion,
+}: EditorPanelProps) {
   if (!question) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-base-content/30">
@@ -27,7 +33,12 @@ export function EditorPanel({ question, onUpdate, onDeleteQuestion }: EditorPane
 
   return (
     <div className="max-w-2xl mx-auto">
-      <QuestionEditor question={question} onUpdate={onUpdate} onDeleteQuestion={onDeleteQuestion} />
+      <QuestionEditor
+        question={question}
+        onUpdate={onUpdate}
+        onDeleteQuestion={onDeleteQuestion}
+        onDuplicateQuestion={onDuplicateQuestion}
+      />
     </div>
   );
 }

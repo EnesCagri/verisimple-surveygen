@@ -1,4 +1,21 @@
-import type { VeriSimpleBridge, SurveyPayload, BridgeResponse } from './types';
+import type {
+  VeriSimpleBridge,
+  SurveyPayload,
+  BridgeResponse,
+  BridgeSaveResponseData,
+} from './types';
+
+/** Razor: `success && data.surveyGuid` — kökte veya `data` içinde gelen GUID’i birleştirir. */
+function normalizeSaveSurveyResponse(raw: BridgeResponse): BridgeResponse {
+  let surveyGuid = raw.surveyGuid;
+  if (!surveyGuid && raw.data && typeof raw.data === 'object') {
+    const d = raw.data as BridgeSaveResponseData;
+    if (typeof d.surveyGuid === 'string' && d.surveyGuid.trim()) {
+      surveyGuid = d.surveyGuid.trim();
+    }
+  }
+  return { ...raw, ...(surveyGuid ? { surveyGuid } : {}) };
+}
 
 /**
  * Returns the host-provided bridge, or `null` when running standalone.
@@ -26,7 +43,7 @@ export async function bridgeSave(payload: SurveyPayload): Promise<BridgeResponse
   }
   try {
     const response = await bridge.saveSurvey(payload);
-    return response;
+    return normalizeSaveSurveyResponse(response);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[VeriSimpleBridge] saveSurvey failed:', message);

@@ -21,7 +21,12 @@ import {
   bridgeNotifyChange,
 } from "../../bridge/bridge";
 import type { SurveyMutators } from "../../utils/aiActions";
+import { isQuestionIncomplete, questionIncompleteReason } from "../../utils/question";
 import type { SidebarTab } from "../sidebar/SidebarTabs";
+import {
+  hasVsSurveyGenInitialKey,
+  isVsSurveyGenExplicitNewMode,
+} from "../../bridge/vsHostInitial";
 
 interface BuilderPageProps {
   survey: Survey;
@@ -35,16 +40,24 @@ interface BuilderPageProps {
       sequentialEdges?: SequentialEdges;
     },
   ) => void;
-  onBack: () => void;
+  onBack?: () => void;
+  /** İlk başarılı bridge kaydından sonra host `surveyGuid` döner; yerel state güncellenir */
+  onBridgeSurveyGuid?: (surveyGuid: string) => void;
 }
 
-export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
+export function BuilderPage({
+  survey,
+  onSave,
+  onBack,
+  onBridgeSurveyGuid,
+}: BuilderPageProps) {
   const surveyHook = useSurvey(
     survey.title,
     survey.questions,
     survey.conditions ?? [],
     survey.nodePositions,
     survey.sequentialEdges,
+    survey.surveyGuid,
   );
 
   const {
@@ -60,6 +73,7 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
     addQuestionWithData,
     updateQuestion,
     deleteQuestion,
+    duplicateQuestion,
     reorderQuestions,
     selectQuestion,
     addCondition,
@@ -71,6 +85,14 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
     getSurveyPayload,
   } = surveyHook;
 
+  const incompleteQuestions = questions.filter(isQuestionIncomplete);
+  const hasIncomplete = incompleteQuestions.length > 0;
+  const saveDisabledReason = hasIncomplete
+    ? incompleteQuestions.length === 1
+      ? `Soru ${incompleteQuestions[0].order}: ${questionIncompleteReason(incompleteQuestions[0]) ?? 'eksik alan var'}`
+      : `${incompleteQuestions.length} soruda eksik alan var (kırmızı kenarlıklar)`
+    : undefined;
+
   const [activeTab, setActiveTab] = useState<SidebarTab>("questions");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [aiChatOpen, setAIChatOpen] = useState(false);
@@ -79,6 +101,34 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  const newSurveyNameDialogRef = useRef<HTMLDialogElement>(null);
+  const newSurveyTitleInputRef = useRef<HTMLInputElement>(null);
+  const newSurveyNamePromptShown = useRef(false);
+  const [newSurveyTitleDraft, setNewSurveyTitleDraft] = useState("");
+  const [newSurveyTitleError, setNewSurveyTitleError] = useState(false);
+
+  // Yeni anket: host `__VS_SURVEYGEN_INITIAL__ === null` veya boş standalone taslak
+  useEffect(() => {
+    if (newSurveyNamePromptShown.current) return;
+    const hostNew = isVsSurveyGenExplicitNewMode();
+    const standaloneEmpty =
+      !hasVsSurveyGenInitialKey() &&
+      survey.title === "Yeni Anket" &&
+      survey.questions.length === 0;
+    if (!hostNew && !standaloneEmpty) return;
+    newSurveyNamePromptShown.current = true;
+    setNewSurveyTitleDraft("");
+    setNewSurveyTitleError(false);
+    queueMicrotask(() => {
+      const el = newSurveyNameDialogRef.current;
+      if (el && !el.open) {
+        el.showModal();
+        newSurveyTitleInputRef.current?.focus();
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnızca ilk mount’ta anket “yeni” mi kontrol edilir
+  }, []);
 
   // Refs for live state getters (avoids stale closures in useAIChat)
   const questionsRef = useRef(questions);
@@ -159,6 +209,18 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
     getSurveyPayload,
   ]);
 
+  const applyNewSurveyTitleFromDialog = useCallback(() => {
+    const trimmed = newSurveyTitleDraft.trim();
+    if (!trimmed) {
+      setNewSurveyTitleError(true);
+      newSurveyTitleInputRef.current?.focus();
+      return;
+    }
+    setNewSurveyTitleError(false);
+    setTitle(trimmed);
+    newSurveyNameDialogRef.current?.close();
+  }, [newSurveyTitleDraft, setTitle]);
+
   const handleSave = useCallback(async () => {
     if (!isBridgeAvailable()) {
       setBridgeMessage({
@@ -175,6 +237,9 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
     setBridgeSaving(false);
 
     if (response.success) {
+      if (response.surveyGuid) {
+        onBridgeSurveyGuid?.(response.surveyGuid);
+      }
       setBridgeMessage({
         type: "success",
         text: response.message ?? "Kaydedildi!",
@@ -187,7 +252,7 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
       });
       setTimeout(() => setBridgeMessage(null), 4000);
     }
-  }, [survey.id, getSurveyPayload]);
+  }, [survey.id, getSurveyPayload, onBridgeSurveyGuid]);
 
   // When switching to flow tab, show the flow canvas in main area
   const mainContent =
@@ -212,6 +277,7 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
           question={selectedQuestion}
           onUpdate={updateQuestion}
           onDeleteQuestion={deleteQuestion}
+          onDuplicateQuestion={duplicateQuestion}
         />
       </div>
     );
@@ -228,6 +294,8 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
             onPreview={() => setPreviewOpen(true)}
             onToggleAI={() => setAIChatOpen((v) => !v)}
             isAIOpen={aiChatOpen}
+            saveDisabled={hasIncomplete}
+            saveDisabledReason={saveDisabledReason}
           />
         }
         sidebar={
@@ -240,6 +308,7 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
             onSelect={selectQuestion}
             onAdd={addQuestion}
             onDelete={deleteQuestion}
+            onDuplicate={duplicateQuestion}
             onReorder={reorderQuestions}
             onUpdate={updateQuestion}
             onRemoveCondition={removeCondition}
@@ -290,6 +359,68 @@ export function BuilderPage({ survey, onSave, onBack }: BuilderPageProps) {
         onUndo={undoChanges}
         onRedo={redoChanges}
       />
+
+      <dialog
+        ref={newSurveyNameDialogRef}
+        className="fixed inset-0 m-auto max-w-[min(100vw-2rem,28rem)] w-full rounded-2xl border border-base-300/50 bg-base-100 p-6 shadow-2xl backdrop:bg-black/40 z-10050"
+        onClose={() => setNewSurveyTitleError(false)}
+      >
+        <form
+          method="dialog"
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            applyNewSurveyTitleFromDialog();
+          }}
+        >
+          <div>
+            <h2 className="text-lg font-semibold text-base-content">
+              Anket adı
+            </h2>
+            <p className="mt-1.5 text-sm text-base-content/60 leading-relaxed">
+              Bu ankete vermek istediğiniz başlığı girin. Üst çubuktan sonra da
+              değiştirebilirsiniz.
+            </p>
+          </div>
+          <label className="grid gap-1.5">
+            <span className="text-sm font-medium text-base-content/80">
+              Başlık
+            </span>
+            <input
+              ref={newSurveyTitleInputRef}
+              type="text"
+              value={newSurveyTitleDraft}
+              onChange={(e) => {
+                setNewSurveyTitleDraft(e.target.value);
+                if (newSurveyTitleError) setNewSurveyTitleError(false);
+              }}
+              className={`input input-bordered w-full text-base ${
+                newSurveyTitleError ? "input-error" : ""
+              }`}
+              placeholder="Örn. Müşteri memnuniyeti anketi"
+              maxLength={200}
+              autoComplete="off"
+            />
+            {newSurveyTitleError && (
+              <span className="text-sm text-error">
+                Lütfen en az bir karakter girin.
+              </span>
+            )}
+          </label>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              className="btn btn-ghost rounded-xl"
+              onClick={() => newSurveyNameDialogRef.current?.close()}
+            >
+              Sonra
+            </button>
+            <button type="submit" className="btn btn-primary rounded-xl">
+              Devam
+            </button>
+          </div>
+        </form>
+      </dialog>
     </>
   );
 }

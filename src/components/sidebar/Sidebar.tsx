@@ -12,6 +12,7 @@ interface SidebarProps {
   onSelect: (guid: string) => void;
   onAdd: () => void;
   onDelete: (guid: string) => void;
+  onDuplicate: (guid: string) => void;
   onReorder: (questions: Question[]) => void;
   onUpdate?: (guid: string, updates: Partial<Omit<Question, 'guid'>>) => void;
   onRemoveCondition: (conditionId: string) => void;
@@ -27,6 +28,7 @@ export function Sidebar({
   onSelect,
   onAdd,
   onDelete,
+  onDuplicate,
   onReorder,
   onUpdate,
   onRemoveCondition,
@@ -64,6 +66,7 @@ export function Sidebar({
               conditions={conditions}
               onSelect={onSelect}
               onDelete={onDelete}
+              onDuplicate={onDuplicate}
               onReorder={onReorder}
               onUpdate={onUpdate}
             />

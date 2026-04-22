@@ -18,6 +18,10 @@ interface AnswerItemProps {
   onImageChange?: (index: number, image: string | undefined) => void;
   onRemove: (index: number) => void;
   canRemove: boolean;
+  /** Enter: bu satırdan sonra boş şık eklenir */
+  onEnterAddAfter?: (index: number) => void;
+  /** Odak yönetimi için (AnswerEditor) */
+  answerInputRef?: (el: HTMLInputElement | null) => void;
 }
 
 export function AnswerItem({
@@ -28,6 +32,8 @@ export function AnswerItem({
   onImageChange,
   onRemove,
   canRemove,
+  onEnterAddAfter,
+  answerInputRef,
 }: AnswerItemProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,11 +54,18 @@ export function AnswerItem({
           {String.fromCharCode(65 + index)}
         </span>
         <input
+          ref={answerInputRef}
           type="text"
           className="input input-bordered input-sm flex-1 rounded-lg bg-base-100 border-base-300/60 focus:border-primary/40"
           placeholder={`Seçenek ${index + 1}`}
           value={value}
           onChange={(e) => onChange(index, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            if (!onEnterAddAfter) return;
+            e.preventDefault();
+            onEnterAddAfter(index);
+          }}
         />
 
         {/* Image toggle button */}

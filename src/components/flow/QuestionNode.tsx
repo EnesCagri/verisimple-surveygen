@@ -12,6 +12,7 @@ import {
   flowBuilderHandleTargetClass,
   flowBuilderTargetHitStyle,
 } from "./flowBuilderHandle";
+import { isQuestionIncomplete, questionIncompleteReason } from "../../utils/question";
 
 export interface QuestionNodeData {
   order: number;
@@ -181,6 +182,8 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
     onDelete,
   } = d;
   const isControl = settings?.isControlQuestion === true;
+  const incomplete = isQuestionIncomplete({ order, text, type, answers, guid, settings });
+  const incompleteReason = incomplete ? (questionIncompleteReason({ order, text, type, answers, guid, settings }) ?? 'Eksik alan var') : null;
 
   const config = typeConfig[type] ?? { label: "Bilinmeyen", icon: null };
 
@@ -251,8 +254,11 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
         className={`
           group flex cursor-default rounded-2xl border-2 shadow-lg min-w-[300px] max-w-[360px]
           transition-all duration-200 bg-base-100
-          ${
-            selected
+          ${incomplete
+            ? selected
+              ? "border-error shadow-error/20 bg-error/3"
+              : "border-error/55 bg-error/3 hover:border-error/75"
+            : selected
               ? `border-primary shadow-primary/20 ${isControl ? "ring-2 ring-accent/35 ring-offset-2 ring-offset-base-100" : ""}`
               : isControl
                 ? "border-accent/55 bg-accent/7 hover:border-accent/75"
@@ -339,16 +345,16 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
         {/* Header */}
         <div className="flex items-center gap-3 px-5 pt-4 pb-3">
           <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base font-bold ${isControl ? "bg-accent/15 text-accent" : "bg-primary/10 text-primary"}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base font-bold ${incomplete ? "bg-error/15 text-error" : isControl ? "bg-accent/15 text-accent" : "bg-primary/10 text-primary"}`}
           >
             {order}
           </span>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 text-sm font-medium text-base-content/45">
+            <div className={`flex items-center gap-1.5 text-sm font-medium ${incomplete ? "text-error/60" : "text-base-content/45"}`}>
               {config.icon}
               {config.label}
             </div>
-            {isControl && (
+            {isControl && !incomplete && (
               <span
                 className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-accent/45 bg-accent/12 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-accent shadow-sm"
                 title="Kontrol sorusu — doğru cevap tanımlı"
@@ -358,7 +364,18 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
               </span>
             )}
           </div>
-          {conditions.length > 0 && (
+          {incomplete && (
+            <span
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-error text-white shadow-sm"
+              title={incompleteReason ?? 'Eksik alan var'}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 9v4" />
+                <path d="M12 17h.01" />
+              </svg>
+            </span>
+          )}
+          {!incomplete && conditions.length > 0 && (
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning/15 text-sm font-bold text-warning">
               {conditions.length}
             </span>
@@ -367,8 +384,8 @@ function QuestionNodeComponent({ data, selected }: NodeProps) {
 
         {/* Question text */}
         <div className="px-5 pb-4">
-          <p className="text-lg font-medium text-base-content/80 leading-snug line-clamp-2">
-            {text || "Soru metni..."}
+          <p className={`text-lg font-medium leading-snug line-clamp-2 ${incomplete ? "italic text-error/40" : "text-base-content/80"}`}>
+            {text || "Başlık girilmedi…"}
           </p>
         </div>
 

@@ -1,3 +1,4 @@
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import type { QuestionSettings } from '../../types/survey';
 
 interface MatrixLikertSettingsProps {
@@ -21,6 +22,47 @@ export function MatrixLikertSettings({ settings, onChange }: MatrixLikertSetting
   const rows = settings.rows ?? [''];
   const columns = settings.columns ?? DEFAULT_COLUMNS;
   const matrixType = settings.matrixType ?? 'single';
+
+  const rowInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const colInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const pendingRowFocus = useRef<number | null>(null);
+  const pendingColFocus = useRef<number | null>(null);
+
+  const addRowAfter = useCallback(
+    (afterIndex: number) => {
+      const insertAt = afterIndex + 1;
+      pendingRowFocus.current = insertAt;
+      const next = [...rows];
+      next.splice(insertAt, 0, '');
+      onChange({ ...settings, rows: next });
+    },
+    [rows, settings, onChange],
+  );
+
+  const addColumnAfter = useCallback(
+    (afterIndex: number) => {
+      const insertAt = afterIndex + 1;
+      pendingColFocus.current = insertAt;
+      const next = [...columns];
+      next.splice(insertAt, 0, '');
+      onChange({ ...settings, columns: next });
+    },
+    [columns, settings, onChange],
+  );
+
+  useLayoutEffect(() => {
+    const idx = pendingRowFocus.current;
+    if (idx === null) return;
+    pendingRowFocus.current = null;
+    rowInputRefs.current[idx]?.focus();
+  }, [rows]);
+
+  useLayoutEffect(() => {
+    const idx = pendingColFocus.current;
+    if (idx === null) return;
+    pendingColFocus.current = null;
+    colInputRefs.current[idx]?.focus();
+  }, [columns]);
 
   /* ─── Row helpers ─── */
 
@@ -68,6 +110,7 @@ export function MatrixLikertSettings({ settings, onChange }: MatrixLikertSetting
           </label>
           <div className="grid grid-cols-2 gap-2">
             <button
+              type="button"
               className={`
                 flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all
                 ${matrixType === 'single'
@@ -84,6 +127,7 @@ export function MatrixLikertSettings({ settings, onChange }: MatrixLikertSetting
               Tek Seçim
             </button>
             <button
+              type="button"
               className={`
                 flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all
                 ${matrixType === 'multiple'
@@ -117,14 +161,23 @@ export function MatrixLikertSettings({ settings, onChange }: MatrixLikertSetting
                   {i + 1}
                 </span>
                 <input
+                  ref={(el) => {
+                    rowInputRefs.current[i] = el;
+                  }}
                   type="text"
                   className="input input-bordered input-sm flex-1 rounded-lg bg-base-100 border-base-300/60 focus:border-primary/40"
                   placeholder={`Madde ${i + 1}`}
                   value={row}
                   onChange={(e) => handleRowChange(i, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                    e.preventDefault();
+                    addRowAfter(i);
+                  }}
                 />
                 {rows.length > 1 && (
                   <button
+                    type="button"
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-error/10 text-base-content/30 hover:text-error"
                     onClick={() => removeRow(i)}
                     title="Satırı sil"
@@ -139,6 +192,7 @@ export function MatrixLikertSettings({ settings, onChange }: MatrixLikertSetting
             ))}
           </div>
           <button
+            type="button"
             className="mt-2 text-sm font-medium text-primary/70 hover:text-primary transition-colors flex items-center gap-1.5"
             onClick={addRow}
           >
@@ -165,14 +219,23 @@ export function MatrixLikertSettings({ settings, onChange }: MatrixLikertSetting
                   {String.fromCharCode(65 + i)}
                 </span>
                 <input
+                  ref={(el) => {
+                    colInputRefs.current[i] = el;
+                  }}
                   type="text"
                   className="input input-bordered input-sm flex-1 rounded-lg bg-base-100 border-base-300/60 focus:border-primary/40"
                   placeholder={`Ölçek ${i + 1}`}
                   value={col}
                   onChange={(e) => handleColumnChange(i, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                    e.preventDefault();
+                    addColumnAfter(i);
+                  }}
                 />
                 {columns.length > 2 && (
                   <button
+                    type="button"
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-error/10 text-base-content/30 hover:text-error"
                     onClick={() => removeColumn(i)}
                     title="Sütunu sil"
@@ -187,6 +250,7 @@ export function MatrixLikertSettings({ settings, onChange }: MatrixLikertSetting
             ))}
           </div>
           <button
+            type="button"
             className="mt-2 text-sm font-medium text-primary/70 hover:text-primary transition-colors flex items-center gap-1.5"
             onClick={addColumn}
           >

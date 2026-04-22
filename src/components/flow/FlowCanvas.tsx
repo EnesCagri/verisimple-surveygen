@@ -13,6 +13,7 @@ import {
   Controls,
   type Node,
   type Edge,
+  type EdgeChange,
   type Connection,
   useNodesState,
   useEdgesState,
@@ -51,6 +52,36 @@ const INVALID_END_NODE_ID = "__invalid_end__";
 
 /** `seq-__start__-<hedefGuid>` — hedef UUID içinde tire olabileceği için lastIndexOf ile bölünmez */
 const SEQ_START_EDGE_PREFIX = `seq-${START_NODE_ID}-`;
+
+/**
+ * UUID-safe parser for sequential edge ids.
+ *
+ * Edge id format: `seq-<sourceGuid>-<targetGuid>`
+ * Both source and target are UUIDs (containing hyphens), so splitting on
+ * lastIndexOf("-") is incorrect. Instead we match known question GUIDs as
+ * a prefix of the raw string (after stripping "seq-").
+ *
+ * Returns null when the edge id cannot be parsed (e.g. unrecognised format).
+ */
+function parseSeqEdgeSourceTarget(
+  edgeId: string,
+  sortedQuestions: Question[],
+): { sourceGuid: string; targetGuid: string } | null {
+  if (edgeId.startsWith(SEQ_START_EDGE_PREFIX)) {
+    return {
+      sourceGuid: "__start__",
+      targetGuid: edgeId.slice(SEQ_START_EDGE_PREFIX.length),
+    };
+  }
+  const raw = edgeId.startsWith("seq-") ? edgeId.slice(4) : edgeId;
+  for (const q of sortedQuestions) {
+    const prefix = q.guid + "-";
+    if (raw.startsWith(prefix)) {
+      return { sourceGuid: q.guid, targetGuid: raw.slice(prefix.length) };
+    }
+  }
+  return null;
+}
 
 function collectNodePositionsFromNodes(nodes: Node[]): NodePositions {
   const positions: NodePositions = {};
@@ -484,8 +515,86 @@ function FlowCanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
+  /**
+   * Intercept edge changes so that sequential edge *removals* (e.g. via the
+   * keyboard Delete key) are routed through `sequentialEdges` state rather than
+   * being applied directly to React Flow's local edge list.
+   *
+   * Without this wrapper, pressing Delete on a selected sequential edge only
+   * removes it from React Flow's internal state; the next `buildEdges` call
+   * (triggered by any state change) would bring the edge back because
+   * `sequentialEdges.blockedEdges` was never updated.
+   */
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange<Edge>[]) => {
+      const seqRemovals = changes.filter(
+        (c) => c.type === "remove" && (c as { id: string }).id.startsWith("seq-"),
+      ) as Array<{ type: "remove"; id: string }>;
+
+      const rest = changes.filter(
+        (c) => !(c.type === "remove" && (c as { id: string }).id.startsWith("seq-")),
+      );
+
+      if (rest.length > 0) onEdgesChange(rest);
+
+      if (seqRemovals.length > 0 && onSequentialEdgesChange) {
+        const current = sequentialEdges ?? {};
+        const blocked = new Set(current.blockedEdges ?? []);
+        let customEdgesMut = [...(current.customEdges ?? [])];
+
+        for (const removal of seqRemovals) {
+          blocked.add(removal.id);
+          const parsed = parseSeqEdgeSourceTarget(removal.id, sortedQuestions);
+          if (!parsed) continue;
+          const { sourceGuid } = parsed;
+
+          customEdgesMut = customEdgesMut.filter((e) => e.source !== sourceGuid);
+
+          if (sourceGuid === "__start__") {
+            if (sortedQuestions.length > 0) {
+              blocked.add(`${SEQ_START_EDGE_PREFIX}${sortedQuestions[0].guid}`);
+            }
+          } else {
+            const srcIdx = sortedQuestions.findIndex(
+              (q) => q.guid === sourceGuid,
+            );
+            if (srcIdx >= 0) {
+              if (srcIdx < sortedQuestions.length - 1) {
+                blocked.add(
+                  `seq-${sourceGuid}-${sortedQuestions[srcIdx + 1].guid}`,
+                );
+              } else {
+                blocked.add(`seq-${sourceGuid}-end`);
+              }
+            }
+          }
+        }
+
+        // Also apply the removals to React Flow state for immediate visual update
+        onEdgesChange(seqRemovals);
+        onSequentialEdgesChange({
+          blockedEdges: blocked.size > 0 ? Array.from(blocked) : undefined,
+          customEdges: customEdgesMut.length > 0 ? customEdgesMut : undefined,
+        });
+      }
+    },
+    [onEdgesChange, onSequentialEdgesChange, sequentialEdges, sortedQuestions],
+  );
+
   // Track if any node is currently being dragged
   const [isDragging, setIsDragging] = useState(false);
+
+  // Source node ref used for drop-anywhere connection detection
+  const connectSourceRef = useRef<{ nodeId: string } | null>(null);
+
+  const onConnectStart = useCallback(
+    (_: MouseEvent | TouchEvent, params: { nodeId?: string | null }) => {
+      connectSourceRef.current = params.nodeId
+        ? { nodeId: params.nodeId }
+        : null;
+    },
+    [],
+  );
 
   const [pendingConn, setPendingConn] = useState<PendingConnection | null>(
     null,
@@ -546,15 +655,11 @@ function FlowCanvasInner({
   }, [nodes]);
 
   const handleAutoLayout = useCallback(() => {
-    setNodes((prev) => {
-      const next = applyDagreLayout(prev, edges);
-      onNodePositionsChange?.(collectNodePositionsFromNodes(next));
-      return next;
-    });
+    setNodes((prev) => applyDagreLayout(prev, edges));
     requestAnimationFrame(() => {
       fitView({ padding: 0.32, maxZoom: 1, duration: 320 });
     });
-  }, [edges, setNodes, fitView, onNodePositionsChange]);
+  }, [edges, setNodes, fitView]);
 
   const sequentialKey = useMemo(
     () => JSON.stringify(sequentialEdges ?? {}),
@@ -733,6 +838,46 @@ function FlowCanvasInner({
     [sequentialEdges, sortedQuestions, onSequentialEdgesChange],
   );
 
+  /** Drop-anywhere: if released over a node body (not a handle), fire onConnect */
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      const src = connectSourceRef.current;
+      connectSourceRef.current = null;
+      if (!src?.nodeId) return;
+
+      const clientX =
+        "changedTouches" in event
+          ? event.changedTouches[0]?.clientX ?? 0
+          : event.clientX;
+      const clientY =
+        "changedTouches" in event
+          ? event.changedTouches[0]?.clientY ?? 0
+          : event.clientY;
+
+      const el = document.elementFromPoint(clientX, clientY);
+      if (!el) return;
+
+      // If released on a handle, React Flow already handled the connection
+      if (el.closest(".react-flow__handle")) return;
+
+      const nodeEl = el.closest(".react-flow__node");
+      if (!nodeEl) return;
+      const targetNodeId = nodeEl.getAttribute("data-id");
+      if (!targetNodeId || targetNodeId === src.nodeId) return;
+
+      const conn: Connection = {
+        source: src.nodeId,
+        target: targetNodeId,
+        sourceHandle: null,
+        targetHandle: null,
+      };
+      if (isValidConnection(conn)) {
+        onConnect(conn);
+      }
+    },
+    [isValidConnection, onConnect],
+  );
+
   /** Create a sequential edge from the connection type menu */
   const handleCreateSequential = useCallback(() => {
     if (!connTypeMenu || !onSequentialEdgesChange) return;
@@ -866,51 +1011,38 @@ function FlowCanvasInner({
     if (contextMenu.type === "condition") {
       onRemoveCondition(contextMenu.id);
     } else if (contextMenu.type === "sequential" && onSequentialEdgesChange) {
-      // Block this sequential edge
       const edgeId = contextMenu.id;
       const current = sequentialEdges ?? {};
       const blocked = new Set(current.blockedEdges ?? []);
       blocked.add(edgeId);
 
-      // Parse source/target from edge id (başlangıç: seq-__start__-<guid>, guid içinde tire olabilir)
-      let sourceId: string;
-      let targetId: string;
-      if (edgeId.startsWith(SEQ_START_EDGE_PREFIX)) {
-        sourceId = START_NODE_ID;
-        targetId = edgeId.slice(SEQ_START_EDGE_PREFIX.length);
-      } else {
-        const raw = edgeId.startsWith("seq-") ? edgeId.slice(4) : edgeId;
-        const splitAt = raw.lastIndexOf("-");
-        sourceId = splitAt >= 0 ? raw.slice(0, splitAt) : raw;
-        targetId = splitAt >= 0 ? raw.slice(splitAt + 1) : "";
-      }
+      // UUID-safe parse: lastIndexOf("-") is incorrect for UUID edge ids.
+      const parsed = parseSeqEdgeSourceTarget(edgeId, sortedQuestions);
+      const sourceGuid = parsed?.sourceGuid;
 
-      // Remove custom sequential edge(s) from same source to keep it disconnected
-      const customEdges = (current.customEdges ?? []).filter(
-        (e) => e.source !== sourceId,
-      );
+      // Remove all custom sequential edges from the same source so the
+      // deleted connection is not immediately re-created from customEdges.
+      const customEdges = sourceGuid
+        ? (current.customEdges ?? []).filter((e) => e.source !== sourceGuid)
+        : (current.customEdges ?? []);
 
-      // IMPORTANT:
-      // If user deletes a custom edge, default edge from the same source should NOT return.
-      // So we proactively block that default path too.
-      if (sourceId === START_NODE_ID) {
+      // Also block the *default* sequential edge from the same source so it
+      // does not re-appear after the custom edge is removed.
+      if (sourceGuid === "__start__") {
         if (sortedQuestions.length > 0) {
           blocked.add(`${SEQ_START_EDGE_PREFIX}${sortedQuestions[0].guid}`);
         }
-      } else {
-        const srcIdx = sortedQuestions.findIndex((q) => q.guid === sourceId);
+      } else if (sourceGuid) {
+        const srcIdx = sortedQuestions.findIndex((q) => q.guid === sourceGuid);
         if (srcIdx >= 0) {
           if (srcIdx < sortedQuestions.length - 1) {
-            blocked.add(`seq-${sourceId}-${sortedQuestions[srcIdx + 1].guid}`);
+            blocked.add(
+              `seq-${sourceGuid}-${sortedQuestions[srcIdx + 1].guid}`,
+            );
           } else {
-            blocked.add(`seq-${sourceId}-end`);
+            blocked.add(`seq-${sourceGuid}-end`);
           }
         }
-      }
-
-      // Also keep the exact deleted target blocked (for custom target ids)
-      if (targetId) {
-        blocked.add(`seq-${sourceId}-${targetId}`);
       }
 
       onSequentialEdgesChange({
@@ -997,8 +1129,11 @@ function FlowCanvasInner({
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
+        connectOnClick={false}
         isValidConnection={isValidConnection}
         onEdgeClick={onEdgeClick}
         onNodeClick={onNodeClick}

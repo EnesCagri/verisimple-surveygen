@@ -7,6 +7,23 @@
     <title>survengine</title>
   </head>
   <body>
+    <!--
+      VeriSimple host dışı (Vite): script ekleme → yerel draft kullanılır.
+      İsteğe bağlı test (bundle’dan ÖNCE, main.tsx’ten önce):
+
+      Yeni anket (host ile aynı semantik — taslak birleştirilmez):
+      <script>window.__VS_SURVEYGEN_INITIAL__ = null;</script>
+
+      Düzenle (örnek; gerçek GUID / JSON string kullanın):
+      <script>
+        window.__VS_SURVEYGEN_INITIAL__ = {
+          surveyGuid: '00000000-0000-0000-0000-000000000001',
+          title: 'Test',
+          questions: '[]',
+          conditions: null
+        };
+      </script>
+    -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

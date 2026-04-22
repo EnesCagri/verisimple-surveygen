@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useCallback } from 'react';
 import { answerImageSlotKey } from '../../utils/answerImages';
 import { AnswerItem } from './AnswerItem';
 
@@ -9,6 +10,29 @@ interface AnswerEditorProps {
 }
 
 export function AnswerEditor({ answers, answerImages = {}, onChange, onAnswerImagesChange }: AnswerEditorProps) {
+  const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const pendingFocusIndex = useRef<number | null>(null);
+
+  const handleAddAfter = useCallback(
+    (afterIndex: number) => {
+      const insertAt = afterIndex + 1;
+      pendingFocusIndex.current = insertAt;
+      onChange([...answers.slice(0, insertAt), '', ...answers.slice(insertAt)]);
+    },
+    [answers, onChange],
+  );
+
+  useLayoutEffect(() => {
+    const idx = pendingFocusIndex.current;
+    if (idx === null) return;
+    pendingFocusIndex.current = null;
+    inputRefs.current[idx]?.focus();
+  }, [answers]);
+
+  const setAnswerInputRef = useCallback((index: number) => (el: HTMLInputElement | null) => {
+    inputRefs.current[index] = el;
+  }, []);
+
   const handleAnswerChange = (index: number, value: string) => {
     const oldValue = answers[index] ?? '';
     const updated = [...answers];
@@ -52,6 +76,7 @@ export function AnswerEditor({ answers, answerImages = {}, onChange, onAnswerIma
   };
 
   const handleAdd = () => {
+    pendingFocusIndex.current = answers.length;
     onChange([...answers, '']);
   };
 
@@ -98,6 +123,8 @@ export function AnswerEditor({ answers, answerImages = {}, onChange, onAnswerIma
             onImageChange={handleImageChange}
             onRemove={handleRemove}
             canRemove={answers.length > 1}
+            onEnterAddAfter={handleAddAfter}
+            answerInputRef={setAnswerInputRef(index)}
           />
         ))}
       </div>

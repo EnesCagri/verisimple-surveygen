@@ -44,7 +44,6 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
   } = usePreview(questions, conditions, sequentialEdges);
 
   const [flowOpen, setFlowOpen] = useState(false);
-  const [mobilePreview, setMobilePreview] = useState(false);
 
   // No questions state
   if (questions.length === 0) {
@@ -55,16 +54,35 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
           onClose={onClose}
           flowOpen={flowOpen}
           onToggleFlow={() => setFlowOpen((v) => !v)}
-          mobilePreview={mobilePreview}
-          onToggleMobilePreview={() => setMobilePreview((v) => !v)}
         />
-        <div className="flex-1 flex items-center justify-center">
-          <div className={mobilePreview ? 'w-[390px] max-w-[92vw] rounded-4xl border border-base-300/50 p-6 shadow-xl bg-base-100' : ''}>
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden lg:flex-row">
+          <div className="flex flex-1 min-h-0 items-center justify-center p-6">
             <div className="text-center text-base-content/30">
               <p className="text-lg font-medium mb-1">Soru bulunamadı</p>
               <p className="text-sm">Önce birkaç soru ekleyin</p>
             </div>
           </div>
+          {!flowOpen && (
+            <div className="flex min-h-48 shrink-0 items-center justify-center border-t border-base-300/25 bg-base-100 py-6 pl-3 pr-10 sm:pr-14 lg:w-[min(400px,42vw)] lg:border-l lg:border-t-0">
+              <div className="mockup-phone scale-90 opacity-40 shadow-[0_4px_20px_rgba(0,0,0,0.06)]">
+                <div className="mockup-phone-camera" />
+                <div className="mockup-phone-display h-32 bg-base-100" />
+              </div>
+            </div>
+          )}
+          {flowOpen && (
+            <div className="h-[min(70vh,520px)] min-h-0 w-full shrink-0 border-t border-base-300/30 lg:h-auto lg:w-[min(1000px,48vw)] lg:border-l lg:border-t-0">
+              <LiveFlowPanel
+                questions={questions}
+                conditions={conditions}
+                nodePositions={nodePositions}
+                currentQuestionGuid={null}
+                visitedPath={path}
+                isCompleted={false}
+                onClose={() => setFlowOpen(false)}
+              />
+            </div>
+          )}
         </div>
       </div>
     );
@@ -79,15 +97,11 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
           onClose={onClose}
           flowOpen={flowOpen}
           onToggleFlow={() => setFlowOpen((v) => !v)}
-          mobilePreview={mobilePreview}
-          onToggleMobilePreview={() => setMobilePreview((v) => !v)}
         />
-        <div className="flex-1 flex">
-          {/* Main content */}
-          <div className="flex-1 flex items-center justify-center p-6">
-            <div className={mobilePreview ? 'w-[390px] max-w-[92vw] rounded-4xl border border-base-300/50 p-6 shadow-xl bg-base-100' : ''}>
-              <div className="text-center">
-              <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 ${isSurveyValid ? 'bg-success/10' : 'bg-warning/12'}`}>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto p-6">
+            <div className="text-center">
+              <div className={`mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl ${isSurveyValid ? 'bg-success/10' : 'bg-warning/12'}`}>
                 {isSurveyValid ? (
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-success">
                     <path d="M20 6 9 17l-5-5" />
@@ -101,37 +115,58 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                   </svg>
                 )}
               </div>
-              <h2 className="text-2xl font-bold text-base-content/80 mb-2">{isSurveyValid ? 'Tamamlandı!' : 'Üzgünüz'}</h2>
-              <p className="text-base-content/40 mb-8">
+              <h2 className="mb-2 text-2xl font-bold text-base-content/80">{isSurveyValid ? 'Tamamlandı!' : 'Üzgünüz'}</h2>
+              <p className="mb-8 text-base-content/40">
                 {isSurveyValid
                   ? 'Anketi tamamladınız, teşekkürler.'
                   : 'Bu anket için uygun değilsiniz, ne yazık ki.'}
               </p>
-
-                <div className="flex gap-3 justify-center">
-                  <button className="btn btn-ghost btn-sm rounded-xl" onClick={reset}>
-                    Tekrar Başla
-                  </button>
-                  <button className="btn btn-primary btn-sm rounded-xl px-6" onClick={onClose}>
-                    Kapat
-                  </button>
-                </div>
+              <div className="flex justify-center gap-3">
+                <button type="button" className="btn btn-ghost btn-sm rounded-xl" onClick={reset}>
+                  Tekrar Başla
+                </button>
+                <button type="button" className="btn btn-primary btn-sm rounded-xl px-6" onClick={onClose}>
+                  Kapat
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Live Flow panel */}
+          {!flowOpen && (
+            <div className="flex min-h-56 shrink-0 items-center justify-center border-t border-base-300/25 bg-base-100 py-6 pl-3 pr-10 sm:pr-14 lg:w-[min(400px,42vw)] lg:border-l lg:border-t-0">
+              <div className="mockup-phone shadow-[0_4px_24px_rgba(0,0,0,0.07)]">
+                <div className="mockup-phone-camera" />
+                <div className="mockup-phone-display bg-base-100">
+                  <div className="flex h-full flex-col items-center justify-center gap-2 bg-base-100 px-4 py-8">
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${isSurveyValid ? 'bg-success/10' : 'bg-warning/12'}`}>
+                      {isSurveyValid ? (
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-success">
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                      ) : (
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-warning">
+                          <circle cx="12" cy="12" r="10" />
+                        </svg>
+                      )}
+                    </div>
+                    <p className="text-center text-xs font-semibold text-base-content/60">{isSurveyValid ? 'Tamamlandı' : 'Sonuç'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {flowOpen && (
-            <div className="w-[1000px] shrink-0 h-full">
-            <LiveFlowPanel
-              questions={questions}
-              conditions={conditions}
-              nodePositions={nodePositions}
-              currentQuestionGuid={null}
-              visitedPath={path}
-              isCompleted
-              onClose={() => setFlowOpen(false)}
-            />
+            <div className="h-[min(70vh,520px)] min-h-0 w-full shrink-0 border-t border-base-300/30 lg:h-auto lg:w-[min(1000px,48vw)] lg:border-l lg:border-t-0">
+              <LiveFlowPanel
+                questions={questions}
+                conditions={conditions}
+                nodePositions={nodePositions}
+                currentQuestionGuid={null}
+                visitedPath={path}
+                isCompleted
+                onClose={() => setFlowOpen(false)}
+              />
             </div>
           )}
         </div>
@@ -146,97 +181,18 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
         onClose={onClose}
         flowOpen={flowOpen}
         onToggleFlow={() => setFlowOpen((v) => !v)}
-        mobilePreview={mobilePreview}
-        onToggleMobilePreview={() => setMobilePreview((v) => !v)}
       />
 
-      {/* Main body = Question + optional flow panel */}
-      <div className="flex-1 min-h-0 flex overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pb-14 sm:p-6 sm:pb-20">
-          {mobilePreview ? (
-            <div className="flex min-h-0 flex-1 items-center justify-center">
-            <div className="mockup-phone shadow-2xl">
-              <div className="mockup-phone-camera" />
-              <div className="mockup-phone-display">
-                <div className="flex flex-col w-full h-full bg-base-100">
-                  {/* Progress */}
-                  <div className="px-4 pt-12 pb-2 shrink-0">
-                    <ProgressBar
-                      progress={progress}
-                      currentStep={currentStep}
-                      totalSteps={totalSteps}
-                    />
-                  </div>
-
-                  {/* Question content */}
-                  <div className="flex-1 overflow-y-auto">
-                    <div className="w-full px-5 py-4">
-                      {currentQuestion && (
-                        <PreviewQuestion
-                          key={currentQuestion.guid}
-                          question={currentQuestion}
-                          selectedAnswers={getSelectedAnswers(currentQuestion.guid)}
-                          onSelectAnswer={selectAnswer}
-                          onSingleChoiceNext={goNextAfterAnswer}
-                          textValue={getTextAnswer(currentQuestion.guid)}
-                          onTextChange={setTextAnswer}
-                          ratingValue={getRatingAnswer(currentQuestion.guid)}
-                          onRatingChange={setRatingAnswer}
-                          matrixValue={getMatrixAnswer(currentQuestion.guid)}
-                          onMatrixChange={setMatrixAnswer}
-                          sortableValue={getSortableAnswer(currentQuestion.guid)}
-                          onSortableChange={setSortableAnswer}
-                          isMobilePreview
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Toast: akışta (overflow:hidden mockup’ta absolute kırpılmasın), butonların hemen üstü */}
-                  <div className="relative z-20 shrink-0 border-t border-base-300/30 bg-base-100 px-5 pb-3 pt-2">
-                    {skipToast && (
-                      <div className="pointer-events-none mb-2 flex justify-center animate-[fadeSlideIn_0.25s_ease-out]">
-                        <div className="w-full max-w-xs sm:max-w-sm">
-                          <SkipToastBanner kind={skipToast.kind} />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <button
-                        className={`btn btn-ghost btn-sm rounded-xl gap-1 ${isFirst ? 'invisible' : ''}`}
-                        onClick={goPrev}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="m15 18-6-6 6-6" />
-                        </svg>
-                        Geri
-                      </button>
-                      <button className="btn btn-primary btn-sm rounded-xl px-5 gap-1" onClick={goNext}>
-                        {isLast ? 'Tamamla' : 'İleri'}
-                        {!isLast && (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="m9 18 6-6-6-6" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            </div>
-          ) : (
+      {/* Main body: (!flowOpen) web + mobil yan yana; (flowOpen) sadece web + Live Flow */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div
+          className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${flowOpen ? 'flex-col p-3 pb-14 sm:p-6 sm:pb-20' : 'flex-col gap-4 p-3 pb-14 sm:flex-row sm:p-6 sm:pb-20'}`}
+        >
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <div className="flex h-full min-h-0 w-full flex-col bg-base-100 sm:mx-auto sm:max-w-xl">
-              {/* Progress */}
               <div className="w-full shrink-0 px-6 pt-3 sm:px-0 sm:pt-4">
-                <ProgressBar
-                  progress={progress}
-                  currentStep={currentStep}
-                  totalSteps={totalSteps}
-                />
+                <ProgressBar progress={progress} currentStep={currentStep} totalSteps={totalSteps} />
               </div>
-
-              {/* Question content — kayar; üstten hizalı, alt nav sabit */}
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="w-full max-w-2xl px-6 py-4 sm:mx-auto sm:py-6">
                   {currentQuestion && (
@@ -258,8 +214,6 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                   )}
                 </div>
               </div>
-
-              {/* Nav + toast: akışta, gömülü / overflow-hidden üstlerde güvenli */}
               <div className="relative z-20 shrink-0 border-t border-base-300/30 bg-base-100">
                 <div className="mx-auto max-w-xl px-6 pb-3 pt-2">
                   {skipToast && (
@@ -269,9 +223,9 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                       </div>
                     </div>
                   )}
-
                   <div className="flex items-center justify-between">
                     <button
+                      type="button"
                       className={`btn btn-ghost btn-sm rounded-xl gap-2 ${isFirst ? 'invisible' : ''}`}
                       onClick={goPrev}
                     >
@@ -280,8 +234,7 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                       </svg>
                       Geri
                     </button>
-
-                    <button className="btn btn-primary btn-sm rounded-xl px-6 gap-2" onClick={goNext}>
+                    <button type="button" className="btn btn-primary btn-sm rounded-xl gap-2 px-6" onClick={goNext}>
                       {isLast ? 'Tamamla' : 'İleri'}
                       {!isLast && (
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -293,12 +246,79 @@ export function PreviewPage({ title, questions, conditions = [], nodePositions, 
                 </div>
               </div>
             </div>
+          </div>
+
+          {!flowOpen && (
+            <div className="flex min-h-0 shrink-0 flex-col items-center justify-center overflow-hidden border-t border-base-300/20 bg-base-100 pt-2 pl-3 pr-10 sm:w-[min(400px,38vw)] sm:border-l sm:border-t-0 sm:pt-0 sm:pr-14">
+              <div className="flex min-h-0 flex-1 w-full items-center justify-center py-2">
+                <div className="mockup-phone shadow-[0_4px_24px_rgba(0,0,0,0.07)]">
+                  <div className="mockup-phone-camera" />
+                  <div className="mockup-phone-display bg-base-100">
+                    <div className="flex h-full min-h-full w-full flex-col bg-base-100">
+                      <div className="shrink-0 bg-base-100 px-4 pb-2 pt-12">
+                        <ProgressBar progress={progress} currentStep={currentStep} totalSteps={totalSteps} />
+                      </div>
+                      <div className="min-h-0 flex-1 overflow-y-auto bg-base-100">
+                        <div className="w-full px-3 py-3">
+                          {currentQuestion && (
+                            <PreviewQuestion
+                              key={`m-${currentQuestion.guid}`}
+                              question={currentQuestion}
+                              selectedAnswers={getSelectedAnswers(currentQuestion.guid)}
+                              onSelectAnswer={selectAnswer}
+                              onSingleChoiceNext={goNextAfterAnswer}
+                              textValue={getTextAnswer(currentQuestion.guid)}
+                              onTextChange={setTextAnswer}
+                              ratingValue={getRatingAnswer(currentQuestion.guid)}
+                              onRatingChange={setRatingAnswer}
+                              matrixValue={getMatrixAnswer(currentQuestion.guid)}
+                              onMatrixChange={setMatrixAnswer}
+                              sortableValue={getSortableAnswer(currentQuestion.guid)}
+                              onSortableChange={setSortableAnswer}
+                              isMobilePreview
+                            />
+                          )}
+                        </div>
+                      </div>
+                      <div className="relative z-20 shrink-0 border-t border-base-300/30 bg-base-100 px-3 pb-3 pt-2">
+                        {skipToast && (
+                          <div className="pointer-events-none mb-2 flex justify-center animate-[fadeSlideIn_0.25s_ease-out]">
+                            <div className="w-full max-w-xs sm:max-w-sm">
+                              <SkipToastBanner kind={skipToast.kind} />
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <button
+                            type="button"
+                            className={`btn btn-ghost btn-sm rounded-xl gap-1 ${isFirst ? 'invisible' : ''}`}
+                            onClick={goPrev}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="m15 18-6-6 6-6" />
+                            </svg>
+                            Geri
+                          </button>
+                          <button type="button" className="btn btn-primary btn-sm gap-1 rounded-xl px-5" onClick={goNext}>
+                            {isLast ? 'Tamamla' : 'İleri'}
+                            {!isLast && (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="m9 18 6-6-6-6" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Live Flow panel — slides in from right */}
         {flowOpen && (
-          <div className="w-[1000px] shrink-0 h-full animate-[slideInRight_0.3s_ease-out]">
+          <div className="h-[min(70vh,520px)] w-full shrink-0 animate-[slideInRight_0.3s_ease-out] border-t border-base-300/30 sm:h-auto sm:w-[min(1000px,48vw)] sm:border-l sm:border-t-0">
             <LiveFlowPanel
               questions={questions}
               conditions={conditions}
@@ -322,15 +342,11 @@ function PreviewHeader({
   onClose,
   flowOpen,
   onToggleFlow,
-  mobilePreview,
-  onToggleMobilePreview,
 }: {
   title: string;
   onClose: () => void;
   flowOpen: boolean;
   onToggleFlow: () => void;
-  mobilePreview: boolean;
-  onToggleMobilePreview: () => void;
 }) {
   return (
     <header className="flex items-center gap-4 px-5 py-3 border-b border-base-300/30">
@@ -361,24 +377,7 @@ function PreviewHeader({
           <path d="M7 12h4" />
           <path d="M13 12h4" />
         </svg>
-        {flowOpen ? 'Live Flow' : 'Live Flow'}
-      </button>
-      <button
-        className={`
-          flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-          ${mobilePreview
-            ? 'bg-primary/10 text-primary border border-primary/30'
-            : 'bg-base-200/60 text-base-content/40 hover:text-base-content/60 hover:bg-base-200 border border-transparent'
-          }
-        `}
-        onClick={onToggleMobilePreview}
-        title={mobilePreview ? 'Masaüstü önizlemeye geç' : 'Mobil önizlemeye geç'}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="7" y="2" width="10" height="20" rx="2" />
-          <line x1="11" y1="18" x2="13" y2="18" />
-        </svg>
-        {mobilePreview ? 'Masaüstüne Geç' : 'Mobil’e Geç'}
+        Live Flow
       </button>
 
       <button

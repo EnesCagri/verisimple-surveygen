@@ -24,6 +24,7 @@ interface QuestionEditorProps {
   question: Question;
   onUpdate: (guid: string, updates: Partial<Omit<Question, 'guid'>>) => void;
   onDeleteQuestion: (guid: string) => void;
+  onDuplicateQuestion: (guid: string) => void;
 }
 
 /** İki adımda aynı üst şerit: rozet, padding, minimum yükseklik */
@@ -35,6 +36,23 @@ function OrderBadge({ order }: { order: number }) {
     <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-content">
       {order}
     </span>
+  );
+}
+
+function DuplicateQuestionButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="btn btn-ghost btn-xs h-9 min-h-9 shrink-0 gap-1 border border-transparent px-2 text-base-content/55 hover:border-primary/25 hover:bg-primary/10 hover:text-primary"
+      onClick={onClick}
+      title="Soruyu kopyala (listede hemen altına eklenir)"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>
+      <span className="hidden font-medium sm:inline">Kopyala</span>
+    </button>
   );
 }
 
@@ -263,7 +281,12 @@ function MiniSwitch({
 
 /* ────────────────────────── Main component ────────────────────────── */
 
-export function QuestionEditor({ question, onUpdate, onDeleteQuestion }: QuestionEditorProps) {
+export function QuestionEditor({
+  question,
+  onUpdate,
+  onDeleteQuestion,
+  onDuplicateQuestion,
+}: QuestionEditorProps) {
   const imgRef = useRef<HTMLInputElement>(null);
   const [editStep, setEditStep] = useState<'type' | 'edit'>(() =>
     questionNeedsTypeStep(question) ? 'type' : 'edit',
@@ -326,7 +349,11 @@ export function QuestionEditor({ question, onUpdate, onDeleteQuestion }: Questio
           <button type="button" className="btn btn-ghost rounded-xl" onClick={closeDeleteDialog}>
             Vazgeç
           </button>
-          <button type="button" className="btn btn-error rounded-xl" onClick={confirmDeleteQuestion}>
+          <button
+            type="button"
+            className="btn rounded-xl border-2 border-error bg-transparent font-semibold text-error hover:bg-error hover:border-error hover:text-white"
+            onClick={confirmDeleteQuestion}
+          >
             Sil
           </button>
         </div>
@@ -352,6 +379,7 @@ export function QuestionEditor({ question, onUpdate, onDeleteQuestion }: Questio
               className="flex min-h-[1.75rem] min-w-[6.5rem] max-w-22 items-center gap-1 rounded-full border border-transparent px-2.5 py-1 sm:max-w-44"
               aria-hidden
             />
+            <DuplicateQuestionButton onClick={() => onDuplicateQuestion(question.guid)} />
             <DeleteQuestionButton onClick={openDeleteDialog} />
           </div>
         </div>
@@ -466,34 +494,31 @@ export function QuestionEditor({ question, onUpdate, onDeleteQuestion }: Questio
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm h-9 min-h-9 shrink-0 gap-1 rounded-lg border border-base-content/15 bg-base-100 px-2.5 text-sm font-medium text-base-content/80 shadow-sm hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-            onClick={() => setEditStep('type')}
-            title="Soru tipi seçimine dön"
-          >
+          {/* Soru tipi dropdown — Geri butonu yerine */}
+          <div className="relative flex items-center">
+            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/35">
+              {currentType?.icon}
+            </span>
+            <select
+              value={question.type}
+              onChange={(e) => handleTypeSelect(Number(e.target.value) as QuestionType)}
+              className="h-9 appearance-none rounded-lg border border-base-content/15 bg-base-100 pl-8 pr-7 text-sm font-medium text-base-content/75 shadow-sm transition-colors hover:border-primary/40 focus:border-primary/60 focus:outline-none cursor-pointer"
+              title="Soru tipini değiştir"
+            >
+              {typeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
             <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-base-content/35"
+              width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
               aria-hidden
             >
-              <path d="m15 18-6-6 6-6" />
+              <path d="m6 9 6 6 6-6" />
             </svg>
-            Geri
-          </button>
-          <div
-            className="flex max-w-22 sm:max-w-44 items-center gap-1 truncate rounded-full border border-base-300/50 bg-base-100/80 px-2.5 py-1 text-[11px] text-base-content/50"
-            title={currentType?.label}
-          >
-            <span className="shrink-0 opacity-70">{currentType?.icon}</span>
-            <span className="truncate font-medium">{currentType?.label}</span>
           </div>
+          <DuplicateQuestionButton onClick={() => onDuplicateQuestion(question.guid)} />
           <DeleteQuestionButton onClick={openDeleteDialog} />
         </div>
       </div>
